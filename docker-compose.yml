@@ -1,0 +1,81 @@
+version: "3"
+services:
+  ctrl:
+    image: taemon1337/arena-nerf:2.0.1
+    network_mode: "host"
+    command:
+      - "-name"
+      - "control"
+      - "-enable-controller"
+      - "-enable-connector"
+      - "-enable-game-engine"
+      - "-enable-simulation"
+      - "-node"
+      - "node1"
+      - "-node"
+      - "node2"
+      - "-node"
+      - "node3"
+    volumes:
+      - ./logs:/tmp/logs:rw
+    ports:
+      - 7946:7946
+      - 8000:8000
+  node1:
+    image: taemon1337/arena-nerf:2.0.1
+    network_mode: "host"
+    command:
+      - "-enable-node"
+      - "-enable-connector"
+      - "-name"
+      - "node1"
+      - "-join"
+      - "arena:7946"
+      - "-bind"
+      - "0.0.0.0:7947"
+      - "-advertise"
+      - "arena:7947"
+    depends_on:
+      - ctrl
+    ports:
+      - 7947:7947
+  node2:
+    image: taemon1337/arena-nerf:2.0.1
+    network_mode: "host"
+    command:
+      - "-enable-node"
+      - "-enable-connector"
+      - "-join"
+      - "arena:7946"
+      - "-bind"
+      - "0.0.0.0:7948"
+      - "-advertise"
+      - "arena:7948"
+    depends_on:
+      - ctrl
+    ports:
+      - 7948:7948
+  node3:
+    image: taemon1337/arena-nerf:2.0.1
+    network_mode: "host"
+    command:
+      - "-enable-node"
+      - "-enable-connector"
+    environment:
+      - SERF_NAME=node3
+      - SERF_JOIN_ADDRS=arena:7946
+      - SERF_BIND_ADDR=0.0.0.0:7949
+      - SERF_ADVERTISE_ADDR=arena:7949
+    depends_on:
+      - ctrl
+    ports:
+      - 7949:7949
+  test:
+    image: curlimages/curl:8.1.2
+    network_mode: "host"
+    command:
+      - sh
+      - "-c"
+      - "while true; do sleep 100; done"
+    depends_on:
+      - ctrl
