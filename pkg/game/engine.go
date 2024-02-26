@@ -7,6 +7,7 @@ import (
   "strings"
   "context"
   "math/rand"
+
   "github.com/taemon1337/arena-nerf/pkg/config"
   "github.com/taemon1337/arena-nerf/pkg/constants"
 )
@@ -27,7 +28,7 @@ func NewGameEngine(cfg *config.Config, gamechan *GameChannel, logger *log.Logger
     CurrentGame:  nil,
     CurrentTeams: cfg.Teams,
     CurrentNodes: cfg.Nodes,
-    Logger:       log.New(logger.Writer(), "game-engine: ", logger.Flags()),
+    Logger:       log.New(logger.Writer(), "[GAME]: ", logger.Flags()),
   }
 }
 
@@ -58,7 +59,6 @@ func (ge *GameEngine) StartGame(ctx context.Context) error {
   if ge.GameInProgress() {
     return constants.ERR_GAME_RUNNING
   }
-
 
   expect := len(ge.conf.Nodes)
 
@@ -111,7 +111,7 @@ func (ge *GameEngine) WaitForNodes(expect, timeout int) error {
     // wait for ready
     resp, err := ge.SendQuery(NewGameQuery(constants.NODE_READY, []byte(""), constants.NODE_TAGS))
     if err != nil {
-      log.Printf("error query readiness of nodes: %s", err)
+      ge.Printf("error query readiness of nodes: %s", err)
       return err
     }
     
@@ -124,10 +124,10 @@ func (ge *GameEngine) WaitForNodes(expect, timeout int) error {
     }
     
     if readycount >= expect {
-      log.Printf("nodes ready: %d", readycount)
+      ge.Printf("nodes ready: %d", readycount)
       break // got expected amount node responses indicating readiness
     } else {
-      log.Printf("waiting for %d ready nodes [%d/%d]...", expect, readycount, expect)
+      ge.Printf("waiting for %d ready nodes [%d/%d]...", expect, readycount, expect)
       time.Sleep(time.Duration(timeout))
     }
   }

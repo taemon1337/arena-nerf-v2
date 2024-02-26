@@ -8,8 +8,8 @@ type GameChannel struct {
 
 func NewGameChannel() *GameChannel {
   return &GameChannel{
-    RequestChan:    make(chan GameEvent, 1),
-    EventChan:      make(chan GameEvent, 1),
-    QueryChan:      make(chan GameQuery, 1),
+    RequestChan:    make(chan GameEvent, 5),
+    EventChan:      make(chan GameEvent, 5),
+    QueryChan:      make(chan GameQuery, 5),
   }
 }

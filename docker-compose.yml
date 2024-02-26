@@ -45,6 +45,8 @@ services:
     command:
       - "-enable-node"
       - "-enable-connector"
+      - "-name"
+      - "node2"
       - "-join"
       - "arena:7946"
       - "-bind"

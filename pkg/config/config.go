@@ -40,6 +40,7 @@ func NewConfig(logger *log.Logger) *Config {
   ac.BindAddr = Getenv("SERF_BIND_ADDR", "0.0.0.0")
   ac.AdvertiseAddr = Getenv("SERF_ADVERTISE_ADDR", "")
   ac.EncryptKey = Getenv("SERF_ENCRYPT_KEY", "")
+  ac.LogLevel = Getenv("SERF_LOG_LEVEL", "err")
 
   return &Config{
     EnableController:   false,
@@ -54,7 +55,7 @@ func NewConfig(logger *log.Logger) *Config {
     SerfConf:           sc,
     JoinAddrs:          strings.Split(joinaddrs, ","),
     Timeout:            10, // 10 second timeouts
-    Logger:             log.New(logger.Writer(), "config: ", logger.Flags()),
+    Logger:             log.New(logger.Writer(), "[CONFIG]: ", logger.Flags()),
   }
 }
 

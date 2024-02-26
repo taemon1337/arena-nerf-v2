@@ -17,7 +17,7 @@ import (
 )
 
 func main() {
-  logger := log.New(os.Stdout, "main: ", log.LstdFlags)
+  logger := log.New(os.Stdout, "[main]: ", log.LstdFlags)
   cfg := config.NewConfig(logger)
   gamechan := game.NewGameChannel()
 

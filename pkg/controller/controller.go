@@ -22,7 +22,7 @@ type Controller struct {
 }
 
 func NewController(cfg *config.Config, gamechan *game.GameChannel, logger *log.Logger) *Controller {
-  logger = log.New(logger.Writer(), "ctrl: ", logger.Flags())
+  logger = log.New(logger.Writer(), "[CTRL]: ", logger.Flags())
 
   return &Controller{
     conf:     cfg,
@@ -46,8 +46,12 @@ func (ctrl *Controller) Start(ctx context.Context) error {
     ctrl.conn.RegisterEventHandler(ctrl)
 
     g.Go(func () error {
-      time.Sleep(5 * time.Second)
+      time.Sleep(3 * time.Second)
       return ctrl.conn.Join()
+    })
+
+    g.Go(func () error {
+      return ctrl.ListenToGame()
     })
   }
 
@@ -88,5 +92,27 @@ func (ctrl *Controller) HandleEvent(e serf.Event) {
   }
   if e.EventType() == serf.EventQuery {
     log.Printf("QUERY: %s", e)
+  }
+}
+
+func (ctrl *Controller) ListenToGame() error {
+  for {
+    select {
+    case q := <-ctrl.gamechan.QueryChan:
+      ctrl.Printf("controller received game query: %s", q)
+      switch q.Query {
+        default:
+          // by default send all queries from game engine to all nodes
+          data := map[string][]byte{}
+          resp, err := ctrl.conn.Query(q.Query, q.Payload, &serf.QueryParam{FilterTags: q.Tags})
+          if err != nil {
+            q.Response <- game.NewGameQueryResponse(data, err)
+          }
+          for r := range resp.ResponseCh() {
+            data[r.From] = r.Payload
+          }
+          q.Response <- game.NewGameQueryResponse(data, err)
+      }
+    }
   }
 }

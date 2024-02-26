@@ -18,7 +18,7 @@ func NewSensor(cfg *config.Config, gamechan *game.GameChannel, logger *log.Logge
   return &Sensor{
     conf:     cfg,
     gc:       gamechan,
-    Logger:   log.New(logger.Writer(), "sensor: ", logger.Flags()),
+    Logger:   log.New(logger.Writer(), "[SENSOR]: ", logger.Flags()),
   }
 }
 

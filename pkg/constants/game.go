@@ -2,7 +2,14 @@ package constants
 
 var (
   // game modes
+  GAME_MODE = "game:mode" // set game mode
   GAME_MODE_SIMULATION = "simulation"
+
+  // game actions
+  GAME_ACTION_BEGIN = "game:begin"
+  GAME_ACTION_END = "game:end"
+  GAME_ACTION_PAUSE = "game:pause"
+  GAME_ACTION_RESET = "game:reset"
 
   // game states
   GAME_STATE_INIT = "game:init"

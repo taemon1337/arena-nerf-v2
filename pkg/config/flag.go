@@ -32,7 +32,10 @@ func (c *Config) Flags() error {
   }
 
   c.AgentConf.Tags = parsedtags
-  c.Nodes = append(c.Nodes, c.AgentConf.NodeName)
+
+  if c.EnableNode {
+    c.Nodes = append(c.Nodes, c.AgentConf.NodeName)
+  }
 
   if c.EnableController {
     c.AgentConf.Tags[constants.TAG_CTRL] = constants.TAG_TRUE

@@ -23,7 +23,7 @@ func NewGameSimulation(cfg *config.Config, gamechan *GameChannel, scoreboard map
     gamechan:       gamechan,
     state:          constants.GAME_STATE_INIT,
     scoreboard:     scoreboard,
-    Logger:         log.New(logger.Writer(), "simulation: ", logger.Flags()),
+    Logger:         log.New(logger.Writer(), "[SIMULATION]: ", logger.Flags()),
   }
 }
 
