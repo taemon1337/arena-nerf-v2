@@ -16,6 +16,8 @@ services:
       - "node2"
       - "-node"
       - "node3"
+      - "-logdir"
+      - "/tmp/logs"
     volumes:
       - ./logs:/tmp/logs:rw
     ports:

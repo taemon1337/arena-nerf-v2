@@ -26,9 +26,11 @@ type Config struct {
   // serf config
   AgentConf               *agent.Config   `yaml:"-" json:"-"`
   SerfConf                *serf.Config    `yaml:"-" json:"-"`
+  Coalesce                bool            `yaml:"coalesce" json:"coalesce"`
   JoinAddrs               []string        `yaml:"join_addrs" json:"join_addrs"`
 
   Timeout                 int             `yaml:"timeout" json:"timeout"`
+  Logdir                  string          `yaml:"logdir" json:"logdir"`
   *log.Logger                             `yaml:"-" json:"-"`
 }
 
@@ -53,8 +55,10 @@ func NewConfig(logger *log.Logger) *Config {
     Nodes:              []string{},
     AgentConf:          ac,
     SerfConf:           sc,
+    Coalesce:           false,
     JoinAddrs:          strings.Split(joinaddrs, ","),
     Timeout:            10, // 10 second timeouts
+    Logdir:             "./logs",
     Logger:             log.New(logger.Writer(), "[CONFIG]: ", logger.Flags()),
   }
 }

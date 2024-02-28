@@ -47,11 +47,11 @@ func (ctrl *Controller) Start(ctx context.Context) error {
 
     g.Go(func () error {
       time.Sleep(3 * time.Second)
-      return ctrl.conn.Join()
+      return ctrl.conn.Join(ctx)
     })
 
     g.Go(func () error {
-      return ctrl.ListenToGame()
+      return ctrl.ListenToGame(ctx)
     })
   }
 
@@ -68,6 +68,7 @@ func (ctrl *Controller) Start(ctx context.Context) error {
       select {
       case <-ctx.Done():
         ctrl.Printf("stopping controller")
+        ctrl.conn.Shutdown()
         return ctx.Err()
       default:
         time.Sleep(3 * time.Second) // do something later
@@ -95,9 +96,19 @@ func (ctrl *Controller) HandleEvent(e serf.Event) {
   }
 }
 
-func (ctrl *Controller) ListenToGame() error {
+func (ctrl *Controller) ListenToGame(ctx context.Context) error {
   for {
     select {
+    case <-ctx.Done():
+      return ctx.Err()
+    case e := <-ctrl.gamechan.EventChan:
+      switch e.Event {
+        default:
+          ctrl.Printf("sending event out to all nodes: %s", e.Event)
+          if err := ctrl.conn.UserEvent(e.Event, e.Payload, ctrl.conf.Coalesce); err != nil {
+            ctrl.Printf("error sending %s event: %s", e.Event, err)
+          }
+      }
     case q := <-ctrl.gamechan.QueryChan:
       ctrl.Printf("controller received game query: %s", q)
       switch q.Query {

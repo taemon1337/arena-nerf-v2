@@ -4,54 +4,51 @@ import (
   "log"
   "fmt"
   "time"
+  "slices"
   "strings"
   "context"
   "math/rand"
+  "encoding/json"
 
   "github.com/taemon1337/arena-nerf/pkg/config"
   "github.com/taemon1337/arena-nerf/pkg/constants"
 )
 
 type GameEngine struct {
-  conf          *config.Config
-  gamechan      *GameChannel
-  CurrentGame   Game
-  CurrentTeams  []string
-  CurrentNodes  []string
+  conf                  *config.Config
+  gamechan              *GameChannel
+  CurrentGame           Game
+  CurrentGameState      *GameState
   *log.Logger
 }
 
 func NewGameEngine(cfg *config.Config, gamechan *GameChannel, logger *log.Logger) *GameEngine {
   return &GameEngine{
-    conf:         cfg,
-    gamechan:     gamechan,
-    CurrentGame:  nil,
-    CurrentTeams: cfg.Teams,
-    CurrentNodes: cfg.Nodes,
-    Logger:       log.New(logger.Writer(), "[GAME]: ", logger.Flags()),
+    conf:               cfg,
+    gamechan:           gamechan,
+    CurrentGame:        nil,
+    CurrentGameState:   NewGameState(NewGameConfig()),
+    Logger:             log.New(logger.Writer(), "[GAME]: ", logger.Flags()),
   }
 }
 
 func (ge *GameEngine) NewGame(mode string) error {
-  newgame := NewGame(mode, ge.conf, ge.gamechan, ge.NewScoreboard(), ge.Logger)
+  newgame := NewGame(mode, ge.conf, ge.gamechan, ge.Logger)
   return ge.MountGame(newgame)
 }
 
-func (ge *GameEngine) GameOver() bool {
-  return ge.CurrentGame == nil || ge.CurrentGame.Completed()
-}
-
 func (ge *GameEngine) GameInProgress() bool {
-  return ge.CurrentGame != nil && ge.CurrentGame.Running()
+  return ge.CurrentGame != nil && ge.CurrentGameState.Running()
 }
 
 func (ge *GameEngine) MountGame(g Game) error {
-  if ge.GameOver() {
-    ge.Printf("loading new game - %s", g)
-    ge.CurrentGame = g
-  } else {
+  if ge.GameInProgress() {
     return constants.ERR_GAME_RUNNING
   }
+  ge.Printf("loading new game - %s", g)
+  // TODO: save old game
+  ge.CurrentGame = g
+  ge.CurrentGameState = NewGameState(NewGameConfig())
   return nil
 }
 
@@ -63,7 +60,33 @@ func (ge *GameEngine) StartGame(ctx context.Context) error {
   expect := len(ge.conf.Nodes)
 
   if err := ge.WaitForNodes(expect, ge.conf.Timeout); err != nil {
+    ge.Printf("error waiting for game nodes: %s", err)
     return constants.ERR_NODES_NOT_READY
+  }
+
+  if err := ge.WaitForGameModeSetup(ge.CurrentGame.Mode()); err != nil {
+    ge.Printf("error sending game mode to nodes: %s", err)
+    return err
+  }
+
+  if err := ge.CurrentGameState.GameSetup(); err != nil {
+    ge.Printf("error setting game up: %s", err)
+    return err
+  }
+
+  // validate the number of teams and nodes (fail game instead of return error)
+  if err := ge.CurrentGameState.ValidateNodes(); err != nil {
+    ge.Printf("error validating node/team configuration: %s", err)
+    if err := ge.FailGame(err); err != nil {
+      return err
+    }
+    return nil // returning error will shutdown which we don't want
+  }
+
+  // start game
+  if err := ge.SendEvent(NewGameEvent(constants.GAME_ACTION_BEGIN, []byte("Let the game begin!"))); err != nil {
+    ge.Printf("error telling nodes to start game: %s", err)
+    return err
   }
 
   ge.Printf("starting game - %s", ge.CurrentGame)
@@ -74,17 +97,29 @@ func (ge *GameEngine) Start(ctx context.Context) error {
   ge.Printf("starting game engine")
   for {
     select {
-    case evt := <-ge.gamechan.EventChan:
-      ge.Printf("game engine received game event: %s", evt)
+    // game engine only listens to RequestChan (controller listens to EventChan)
+    // as it is a shared channel, they would compete over it
     case evt := <-ge.gamechan.RequestChan:
       ge.Printf("game engine received game event request: %s", evt)
       switch evt.Event {
+        case constants.GAME_ACTION_END:
+          ge.Printf("game engine requested end game - %s", string(evt.Payload))
+          if err := ge.EndGame(); err != nil {
+            return err
+          }
         case constants.RANDOM_TEAM_HIT:
           if err := ge.RandomTeamHit(rand.Intn(5)); err != nil {
             ge.Printf("cannot generate random team hit: %s", err)
           }
         default:
           ge.Printf("Unsupported game event request: %s", evt.Event)
+      }
+    case <-time.After(ge.CurrentGameState.GameDuration()):
+      if ge.GameInProgress() {
+        ge.Printf("game time expired, ending game")
+        if err := ge.EndGame(); err != nil {
+          return err
+        }
       }
     case <-ctx.Done():
       ge.Printf("stopping game engine")
@@ -95,19 +130,9 @@ func (ge *GameEngine) Start(ctx context.Context) error {
   }
 }
 
-func (ge *GameEngine) NewScoreboard() map[string]int {
-  sb := map[string]int{}
-
-  for _, team := range ge.CurrentTeams {
-    sb[team] = 0
-  }
-
-  return sb
-}
-
 func (ge *GameEngine) WaitForNodes(expect, timeout int) error {
+  ge.Printf("waiting for nodes to be ready")
   for {
-
     // wait for ready
     resp, err := ge.SendQuery(NewGameQuery(constants.NODE_READY, []byte(""), constants.NODE_TAGS))
     if err != nil {
@@ -132,8 +157,157 @@ func (ge *GameEngine) WaitForNodes(expect, timeout int) error {
     }
   }
   return nil
-
 }
+
+func (ge *GameEngine) WaitForGameModeSetup(mode string) error {
+  ge.Printf("waiting for all game nodes to have proper configuration")
+
+  // set game mode
+  ge.Printf("setting game mode")
+  if err := ge.SendEvent(NewGameEvent(constants.GAME_MODE, []byte(mode))); err != nil {
+    return err
+  }
+
+  // query all nodes game mode
+  resp, err := ge.SendQuery(NewGameQuery(constants.GAME_MODE, []byte(""), constants.NODE_TAGS))
+  if err != nil {
+    ge.Printf("error querying game node: %s", err)
+    return err
+  }
+
+  passed := 0
+
+  // check the game mode on each node was properly set
+  for node, val := range resp {
+    ge.CurrentGameState.AddNode(node)
+    if string(val) == mode {
+      passed += 1
+    } else {
+      ge.Printf("node %s game mode was set to %s, not %s", node, val, mode)
+    }
+  }
+
+  if passed == 0 || passed != len(resp) {
+    return ge.WaitForGameModeSetup(mode) // retry until successful
+  }
+
+  // send all teams to nodes
+  if err := ge.SendEvent(NewGameEvent(constants.GAME_TEAMS, []byte(ge.CurrentGameState.TeamList()))); err != nil {
+    return err
+  }
+
+  return nil
+}
+
+func (ge *GameEngine) FailGame(err error) error {
+  ge.CurrentGameState.SetStatus(constants.GAME_STATUS_FAILED)
+  ge.CurrentGameState.LogGameEvent(NewGameEvent(constants.GAME_ERROR, []byte(fmt.Sprintf("%s", err))))
+
+  if err := ge.LogGame(); err != nil {
+    return err
+  }
+
+  ge.CurrentGame = nil
+  ge.CurrentGameState = NewGameState(NewGameConfig())
+  return nil
+}
+
+func (ge *GameEngine) EndGame() error {
+  ge.CurrentGameState.EndGame()
+
+  scoreboard, nodeboard, err := ge.GetScoreboard()
+  if err != nil {
+    ge.Printf("error compiling node scores: %s", err)
+    return err
+  }
+
+  ge.CurrentGameState.SetBoards(scoreboard, nodeboard)
+  ge.Printf("Final Score: %s", scoreboard)
+
+  for team, count := range scoreboard {
+    if count > ge.CurrentGameState.Highscore() {
+      ge.CurrentGameState.SetWinner(team, count)
+    }
+  }
+
+  ge.Printf("The winning team is %s with a score of %d", ge.CurrentGameState.Winner(), ge.CurrentGameState.Highscore())
+
+  if err := ge.SendEvent(NewGameEvent(constants.GAME_WINNER, []byte(ge.CurrentGameState.Winner()))); err != nil {
+    log.Printf("error sending team winner: %s", err)
+    return err
+  }
+
+  if err := ge.LogGame(); err != nil {
+    return err
+  }
+
+  return nil
+}
+
+func (ge *GameEngine) LogGame() error {
+  if ge.conf.Logdir != "" {
+    err := ge.Logstats()
+    if err != nil {
+      ge.Printf("could not write game log: %s", err)
+      return err
+    } else {
+      ge.Printf("saved game log to %s", ge.Logfile())
+    }
+  }
+  return nil
+}
+
+func (ge *GameEngine) GetScoreboard() (map[string]int, map[string]int, error) {
+  scoreboard := map[string]int{}
+  nodeboard := map[string]int{}
+  nodes := ge.CurrentGameState.Nodes()
+  teams := ge.CurrentGameState.Teams()
+
+  resp, err := ge.SendQuery(NewGameQuery(constants.NODE_SCOREBOARD, []byte(""), constants.NODE_TAGS))
+  if err != nil {
+    ge.Printf("error querying node scoreboards: %s", err)
+    return scoreboard, nodeboard, err
+  }
+
+  // accumulate each node response
+  for node, val := range resp {
+    nodehits := map[string]int{}
+
+    if err := json.Unmarshal(val, &nodehits); err != nil {
+      ge.Printf("cannot parse node hits: %s", err)
+    } else {
+      for key,count := range nodehits {
+        isnode := slices.Contains(nodes, key)
+        isteam := slices.Contains(teams, key)
+
+        if isteam {
+          if _, ok := scoreboard[key]; ok {
+            scoreboard[key] += count
+          } else {
+            scoreboard[key] = count
+          }
+        }
+
+        if isnode {
+          if _, ok := nodeboard[key]; ok {
+            nodeboard[key] += count
+          } else {
+            nodeboard[key] = count
+          }
+        }
+
+        if !isteam && !isnode {
+          msg := fmt.Sprintf("unrecognized team|node %s found in response from node %s", key, node)
+          ge.Printf(msg)
+          //ge.GameStats.Events = append(ge.GameStats.Events, msg)
+        }
+      }
+    }
+  }
+
+  return scoreboard, nodeboard, nil
+}
+
 
 func (ge *GameEngine) SendEvent(e GameEvent) error {
   ge.gamechan.EventChan <- e // tell everyone
@@ -157,8 +331,8 @@ func (ge *GameEngine) RandomTeamHits() error {
 }
 
 func (ge *GameEngine) RandomTeamHit(hits int) error {
-  node := ge.RandomNode()
-  team := ge.RandomTeam()
+  node := ge.CurrentGameState.RandomNode()
+  team := ge.CurrentGameState.RandomTeam()
   evt := strings.Join([]string{node, constants.TEAM_HIT}, constants.SPLIT)
   pay := fmt.Sprintf("%s%s%d", team, constants.SPLIT, hits)
   if err := ge.SendEvent(NewGameEvent(evt, []byte(pay))); err != nil {
@@ -168,20 +342,3 @@ func (ge *GameEngine) RandomTeamHit(hits int) error {
 
   return nil
 }
-
-func (ge *GameEngine) RandomTeam() string {
-  if len(ge.CurrentTeams) > 0 {
-    return ge.CurrentTeams[rand.Intn(len(ge.CurrentTeams))]
-  } else {
-    return ""
-  }
-}
-
-func (ge *GameEngine) RandomNode() string {
-  if len(ge.CurrentNodes) > 0 {
-    return ge.CurrentNodes[rand.Intn(len(ge.CurrentNodes))]
-  } else {
-    return ""
-  }
-}
-

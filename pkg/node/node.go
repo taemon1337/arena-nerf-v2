@@ -21,6 +21,7 @@ type Node struct {
   conn          *connector.Connector
   sensor        *sensor.Sensor
   gamechan      *game.GameChannel
+  nodestate     *NodeState
   *log.Logger
 }
 
@@ -28,11 +29,12 @@ func NewNode(cfg *config.Config, gamechan *game.GameChannel, logger *log.Logger)
   logger = log.New(logger.Writer(), "[NODE]: ", logger.Flags())
 
   return &Node{
-    conf:     cfg,
-    conn:     connector.NewConnector(cfg, logger),
-    gamechan: gamechan,
-    sensor:   sensor.NewSensor(cfg, gamechan, logger),
-    Logger:   logger,
+    conf:       cfg,
+    conn:       connector.NewConnector(cfg, logger),
+    gamechan:   gamechan,
+    sensor:     sensor.NewSensor(cfg, gamechan, logger),
+    nodestate:  NewNodeState(cfg.AgentConf.NodeName),
+    Logger:     logger,
   }
 }
 
@@ -49,8 +51,8 @@ func (n *Node) Start(ctx context.Context) error {
     n.conn.RegisterEventHandler(n)
 
     g.Go(func () error {
-      time.Sleep(5 * time.Second)
-      return n.conn.Join()
+      time.Sleep(3 * time.Second)
+      return n.conn.Join(ctx)
     })
   }
 
@@ -81,6 +83,12 @@ func (n *Node) HandleEvent(evt serf.Event) {
   if evt.EventType() == serf.EventUser {
     e := evt.(serf.UserEvent)
     switch e.Name {
+      case constants.GAME_MODE:
+        n.Printf("set game mode to %s", string(e.Payload))
+        n.nodestate.SetMode(string(e.Payload))
+      case constants.GAME_TEAMS:
+        n.Printf("set game teams - %s", string(e.Payload))
+        n.nodestate.SetTeams(string(e.Payload))
       default:
         n.Printf("unrecognized event - %s", e.Name)
     }
@@ -91,6 +99,8 @@ func (n *Node) HandleEvent(evt serf.Event) {
     switch q.Name {
       case constants.NODE_READY:
         err = q.Respond([]byte(constants.NODE_IS_READY))
+      case constants.GAME_MODE:
+        err = q.Respond([]byte(n.nodestate.GetMode()))
       default:
         n.Printf("unrecognized query - %s", q.Name)
     }

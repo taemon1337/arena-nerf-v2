@@ -28,13 +28,15 @@ func main() {
   logger.Printf(cfg.String())
 
   ctx, cancel := context.WithCancel(context.Background())
-  defer cancel()
-
   g, ctx := errgroup.WithContext(ctx)
 
   sigCh := make(chan os.Signal, 2)
   signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
-  defer signal.Stop(sigCh)
+
+  defer func() {
+    cancel()
+    signal.Stop(sigCh)
+  }()
 
   // watch for signals
   g.Go(func() error {
@@ -76,5 +78,6 @@ func main() {
     logger.Fatal(err)
   } else {
     logger.Printf("Shutdown complete without error.")
+    os.Exit(0)
   }
 }

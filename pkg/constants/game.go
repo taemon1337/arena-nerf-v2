@@ -12,9 +12,15 @@ var (
   GAME_ACTION_RESET = "game:reset"
 
   // game states
-  GAME_STATE_INIT = "game:init"
-  GAME_STATE_RUNNING = "game:running"
-  GAME_STATE_ENDED = "game:over"
+  GAME_STATUS_INIT = "game:init"
+  GAME_STATUS_RUNNING = "game:running"
+  GAME_STATUS_ENDED = "game:over"
+  GAME_STATUS_FAILED = "game:failed"
+  GAME_TEAMS = "game:teams"
+  GAME_WINNER = "game:winner"
+  GAME_ERROR = "game:error"
+
+  NODE_SCOREBOARD = "node:scoreboard"
 
   // game event names
   TARGET_HIT = "target:hit"

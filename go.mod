@@ -3,6 +3,7 @@ module github.com/taemon1337/arena-nerf
 go 1.21.5
 
 require (
+	github.com/google/uuid v1.6.0
 	github.com/hashicorp/serf v0.10.1
 	golang.org/x/sync v0.6.0
 	gopkg.in/yaml.v2 v2.2.2

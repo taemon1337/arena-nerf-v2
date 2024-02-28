@@ -3,6 +3,7 @@ package connector
 import (
   "log"
   "time"
+  "context"
 
   "github.com/hashicorp/serf/serf"
   "github.com/hashicorp/serf/cmd/serf/command/agent"
@@ -27,6 +28,18 @@ func NewConnector(cfg *config.Config, logger *log.Logger) *Connector {
 
 func (c *Connector) IsConnected() bool {
   return c.agent != nil // TODO: improve connection detection
+}
+
+func (c *Connector) Shutdown() {
+  if c.IsConnected() {
+    if err := c.agent.Leave(); err != nil {
+      c.Printf("error leaving connector: %s", err)
+    }
+
+    if err := c.agent.Shutdown(); err != nil {
+      c.Printf("error shutting down agent: %s", err)
+    }
+  }
 }
 
 func (c *Connector) Connect() error {
@@ -57,18 +70,23 @@ func (c *Connector) Connect() error {
   return nil
 }
 
-func (c *Connector) Join() error {
+func (c *Connector) Join(ctx context.Context) error {
   for {
-    i, err := c.agent.Join(c.conf.JoinAddrs, constants.JOIN_REPLAY)
-    if err != nil {
-      log.Printf("error joining %s: %s", c.conf.JoinAddrs, err)
-    }
+    select {
+    case <-ctx.Done():
+      return ctx.Err()
+    default:
+      i, err := c.agent.Join(c.conf.JoinAddrs, constants.JOIN_REPLAY)
+      if err != nil {
+        c.Printf("error joining %s: %s", c.conf.JoinAddrs, err)
+      }
 
-    if i > 0 {
-      log.Printf("successfully joined %d nodes", i)
-      return nil
+      if i > 0 {
+        c.Printf("successfully joined %d nodes", i)
+        return nil
+      }
+      time.Sleep(constants.WAIT_TIME)
     }
-    time.Sleep(constants.WAIT_TIME)
   }
 }
 
