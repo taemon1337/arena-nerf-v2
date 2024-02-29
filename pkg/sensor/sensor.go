@@ -26,7 +26,7 @@ func (s *Sensor) Start(ctx context.Context) error {
   s.Printf("starting sensor")
   for {
     select {
-    case evt := <-s.gc.EventChan:
+    case evt := <-s.gc.SensorChan:
       s.Printf("sensor received game event: %s", evt)
     case <-ctx.Done():
       s.Printf("stopping sensor")

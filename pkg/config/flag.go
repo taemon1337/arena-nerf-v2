@@ -23,6 +23,7 @@ func (c *Config) Flags() error {
   flag.Var((*AppendSliceValue)(&tags), "tag", "add tag to node with key=value")
   flag.Var((*AppendSliceValue)(&c.JoinAddrs), "join", "addresses to try to join automatically and repeatable until success")
   flag.Var((*AppendSliceValue)(&c.Nodes), "node", "add expected node by name, games will wait until all expected nodes are ready")
+  flag.Var((*AppendSliceValue)(&c.Teams), "team", "add teams to be used in games")
   flag.IntVar(&c.Timeout, "timeout", c.Timeout, "number of seconds to wait to timeout nodes/connections/etc")
   flag.StringVar(&c.Logdir, "logdir", c.Logdir, "The directory to store game logs (which are served from the UI)")
 

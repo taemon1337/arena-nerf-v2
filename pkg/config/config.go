@@ -29,6 +29,10 @@ type Config struct {
   Coalesce                bool            `yaml:"coalesce" json:"coalesce"`
   JoinAddrs               []string        `yaml:"join_addrs" json:"join_addrs"`
 
+  // game config
+  WinningScore            int             `yaml:"winning_score" json:"winning_score"`
+  GameLength              string          `yaml:"game_length" json:"game_length"`
+
   Timeout                 int             `yaml:"timeout" json:"timeout"`
   Logdir                  string          `yaml:"logdir" json:"logdir"`
   *log.Logger                             `yaml:"-" json:"-"`
@@ -57,6 +61,8 @@ func NewConfig(logger *log.Logger) *Config {
     SerfConf:           sc,
     Coalesce:           false,
     JoinAddrs:          strings.Split(joinaddrs, ","),
+    WinningScore:       100,
+    GameLength:         "3m",
     Timeout:            10, // 10 second timeouts
     Logdir:             "./logs",
     Logger:             log.New(logger.Writer(), "[CONFIG]: ", logger.Flags()),

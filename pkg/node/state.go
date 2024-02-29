@@ -8,6 +8,7 @@ import (
 
 type NodeState struct {
   name          string          `yaml:"name" json:"name"`
+  status        string          `yaml:"status" json:"status"`
   mode          string          `yaml:"mode" json:"mode"`
   teams         []string        `yaml:"teams" json:"teams"`
   hits          map[string]int  `yaml:"hits" json:"hits"`
@@ -17,11 +18,24 @@ type NodeState struct {
 func NewNodeState(name string) *NodeState {
   return &NodeState{
     name:         name,
+    status:       constants.GAME_STATUS_INIT,
     mode:         "",
     teams:        []string{},
-    hits:         map[string]int{},
+    hits:         map[string]int{name: 0},
     nodelock:     &sync.Mutex{},
   }
+}
+
+func (ns *NodeState) Status() string {
+  return ns.status
+}
+
+func (ns *NodeState) SetStatus(status string) {
+  ns.status = status
+}
+
+func (ns *NodeState) Hits() map[string]int {
+  return ns.hits
 }
 
 func (ns *NodeState) SetName(name string) {
@@ -44,4 +58,16 @@ func (ns *NodeState) SetTeams(teams string) {
 
 func (ns *NodeState) GetMode() string {
   return ns.mode
+}
+
+func (ns *NodeState) AddTeamHit(team string, count int) {
+  if _, ok := ns.hits[team]; ok {
+    ns.hits[team] += count
+  } else {
+    ns.hits[team] = count
+  }
+}
+
+func (ns *NodeState) AddNodeHit(count int) {
+  ns.hits[ns.name] += count
 }

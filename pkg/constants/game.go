@@ -10,6 +10,7 @@ var (
   GAME_ACTION_END = "game:end"
   GAME_ACTION_PAUSE = "game:pause"
   GAME_ACTION_RESET = "game:reset"
+  GAME_ACTION_OFF = "game:off"
 
   // game states
   GAME_STATUS_INIT = "game:init"

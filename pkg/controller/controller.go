@@ -101,7 +101,7 @@ func (ctrl *Controller) ListenToGame(ctx context.Context) error {
     select {
     case <-ctx.Done():
       return ctx.Err()
-    case e := <-ctrl.gamechan.EventChan:
+    case e := <-ctrl.gamechan.NodeChan:
       switch e.Event {
         default:
           ctrl.Printf("sending event out to all nodes: %s", e.Event)

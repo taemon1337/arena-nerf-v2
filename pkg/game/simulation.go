@@ -37,12 +37,22 @@ func (g *GameSimulation) Mode() string {
   return g.mode
 }
 
-func (g *GameSimulation) Start(ctx context.Context) error {
+func (g *GameSimulation) Start(parentctx context.Context) error {
+  ctx, cancel := context.WithCancel(context.Background())
+
   g.Printf("starting game %s", g)
+  g.gamechan.RequestChan <- NewGameEvent(constants.GAME_ACTION_BEGIN, []byte("starting game simulation!"))
+
   for {
     select {
-    case evt := <- g.gamechan.EventChan:
-      g.Printf("game simulation received game event: %s", evt.Event)
+    case evt := <- g.gamechan.GameChan:
+      switch evt.Event {
+        case constants.GAME_ACTION_OFF:
+          g.Printf("shutting down game by event %s", evt.Event)
+          cancel()
+        default:
+          g.Printf("unrecognized simulation event: %s", evt.Event)
+      }
     case <-ctx.Done():
       g.gamechan.RequestChan <- NewGameEvent(constants.GAME_ACTION_END, []byte("stopping game - context done"))
       return ctx.Err()
