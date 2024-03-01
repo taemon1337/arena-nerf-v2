@@ -83,15 +83,34 @@ func (ge *GameEngine) StartGame(ctx context.Context) error {
     return nil // returning error will shutdown which we don't want
   }
 
+  ge.Printf("%s:\n---\n%s", ge.CurrentGame, ge.CurrentGameState)
+
   ge.Printf("passing control to game - %s", ge.CurrentGame)
   return ge.CurrentGame.Start(ctx)
 }
 
 func (ge *GameEngine) Start(ctx context.Context) error {
   ge.Printf("starting game engine")
-  gameduration := ge.CurrentGameState.GameDuration()
 
   for {
+    // we want to eval the game each loop, not just when an event occurs
+    if ge.GameInProgress() {
+      ge.Printf(ge.CurrentGameState.GameStatus())
+      if ge.CurrentGameState.TimeExpired() {
+        ge.Printf("game time expired, ending game")
+        if err := ge.EndGame(); err != nil {
+          return err
+        }
+      }
+
+      if ge.CurrentGameState.WinningScoreReached() {
+        ge.Printf("the winning score has been reached, ending game")
+        if err := ge.EndGame(); err != nil {
+          return err
+        }
+      }
+    }
+
     select {
     // game engine only listens to RequestChan (controller listens to EventChan)
     // as it is a shared channel, they would compete over it
@@ -111,21 +130,22 @@ func (ge *GameEngine) Start(ctx context.Context) error {
           }
         case constants.RANDOM_TEAM_HIT:
           if ge.GameInProgress() {
-            if err := ge.RandomTeamHit(rand.Intn(5)); err != nil {
+            if err := ge.RandomTeamHit(rand.Intn(5)+1); err != nil {
               ge.Printf("cannot generate random team hit: %s", err)
+            }
+          } else {
+            ge.Printf("game engine received request when no game in progress")
+          }
+        case constants.RANDOM_SENSOR_HIT:
+          if ge.GameInProgress() {
+            if err := ge.RandomSensorHit(1); err != nil {
+              ge.Printf("cannot generate random sensor hit: %s", err)
             }
           } else {
             ge.Printf("game engine received request when no game in progress")
           }
         default:
           ge.Printf("Unsupported game event request: %s", evt.Event)
-      }
-    case <-time.After(gameduration):
-      if ge.GameInProgress() {
-        ge.Printf("game time expired, ending game")
-        if err := ge.EndGame(); err != nil {
-          return err
-        }
       }
     case <-ctx.Done():
       ge.Printf("stopping game engine")
@@ -241,14 +261,14 @@ func (ge *GameEngine) EndGame() error {
   ge.Printf("Final Score: %s", scoreboard)
 
   for team, count := range scoreboard {
-    if count > ge.CurrentGameState.Highscore() {
+    if count > ge.CurrentGameState.Highscore {
       ge.CurrentGameState.SetWinner(team, count)
     }
   }
 
-  ge.Printf("The winning team is %s with a score of %d", ge.CurrentGameState.Winner(), ge.CurrentGameState.Highscore())
+  ge.Printf("The winning team is %s with a score of %d", ge.CurrentGameState.Winner, ge.CurrentGameState.Highscore)
 
-  if err := ge.SendEventToNodes(NewGameEvent(constants.GAME_WINNER, []byte(ge.CurrentGameState.Winner()))); err != nil {
+  if err := ge.SendEventToNodes(NewGameEvent(constants.GAME_WINNER, []byte(ge.CurrentGameState.Winner))); err != nil {
     log.Printf("error sending team winner: %s", err)
     return err
   }
@@ -276,16 +296,14 @@ func (ge *GameEngine) LogGame() error {
 func (ge *GameEngine) GetScoreboard() (map[string]int, map[string]int, error) {
   scoreboard := map[string]int{}
   nodeboard := map[string]int{}
-  nodes := ge.CurrentGameState.Nodes()
-  teams := ge.CurrentGameState.Teams()
+  nodes := ge.CurrentGameState.Nodes
+  teams := ge.CurrentGameState.Teams
 
   resp, err := ge.SendQueryToNodes(NewGameQuery(constants.NODE_SCOREBOARD, []byte(""), constants.NODE_TAGS))
   if err != nil {
     ge.Printf("error querying node scoreboards: %s", err)
     return scoreboard, nodeboard, err
   }
-
-  ge.Printf("SCORE BOARD RESP: %s", resp)
 
   // accumulate each node response
   for node, val := range resp {
@@ -346,7 +364,7 @@ func (ge *GameEngine) SendQueryToNodes(q GameQuery) (map[string][]byte, error) {
 
 func (ge *GameEngine) RandomTeamHits() error {
   for i := 1; i <= rand.Intn(10); i++ {
-    if err := ge.RandomTeamHit(rand.Intn(5)); err != nil {
+    if err := ge.RandomTeamHit(rand.Intn(5) + 1); err != nil {
       return err
     }
   }
@@ -358,8 +376,21 @@ func (ge *GameEngine) RandomTeamHit(hits int) error {
   team := ge.CurrentGameState.RandomTeam()
   evt := strings.Join([]string{node, constants.TEAM_HIT}, constants.SPLIT)
   pay := fmt.Sprintf("%s%s%d", team, constants.SPLIT, hits)
-  if err := ge.SendEventToGame(NewGameEvent(evt, []byte(pay))); err != nil {
+  if err := ge.SendEventToNodes(NewGameEvent(evt, []byte(pay))); err != nil {
     ge.Printf("error sending random team hit %s: %s", team, err)
+    return err
+  }
+
+  return nil
+}
+
+func (ge *GameEngine) RandomSensorHit(hits int) error {
+  node := ge.CurrentGameState.RandomNode()
+  sensornumber := rand.Intn(4) + 1 // 1-4
+  evt := strings.Join([]string{node, constants.SENSOR_HIT_REQUEST}, constants.SPLIT)
+  pay := fmt.Sprintf("%s%s%d", sensornumber, constants.SPLIT, hits)
+  if err := ge.SendEventToNodes(NewGameEvent(evt, []byte(pay))); err != nil {
+    ge.Printf("error sending random sensor hit %s: %s", sensornumber, err)
     return err
   }
 

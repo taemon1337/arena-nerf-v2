@@ -26,9 +26,12 @@ var (
   // game event names
   TARGET_HIT = "target:hit"
   TEAM_HIT = "team:hit"
+  SENSOR_HIT = "sensor:hit"
+  SENSOR_HIT_REQUEST = "request:sensor:hit"
 
   // game event requests (from game to game engine)
-  RANDOM_TEAM_HIT = "random:team:hit" // game requests engine for a random team target hit count
+  RANDOM_TEAM_HIT = "random:team:hit"       // game requests engine for a random team target hit count
+  RANDOM_SENSOR_HIT = "random:sensor:hit"   // game requests engine for a random sensor hit (count=1)
 
   // node
   NODE_READY = "node:ready"

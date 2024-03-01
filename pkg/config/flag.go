@@ -11,7 +11,7 @@ func (c *Config) Flags() error {
   flag.BoolVar(&c.EnableController, "enable-controller", c.EnableController, "enables the controller")
   flag.BoolVar(&c.EnableGameEngine, "enable-game-engine", c.EnableGameEngine, "enables the game engine on the controller")
   flag.BoolVar(&c.EnableNode, "enable-node", c.EnableNode, "enables the node")
-  flag.BoolVar(&c.EnableSensor, "enable-sensor", c.EnableSensor, "enables sensors on this node")
+  flag.BoolVar(&c.EnableSensors, "enable-sensors", c.EnableSensors, "enables sensors on this node")
   flag.BoolVar(&c.EnableSimulation, "enable-simulation", c.EnableSimulation, "enables game simulation")
   flag.BoolVar(&c.EnableConnector, "enable-connector", c.EnableConnector, "enables clustering with other nodes")
 
@@ -26,6 +26,9 @@ func (c *Config) Flags() error {
   flag.Var((*AppendSliceValue)(&c.Teams), "team", "add teams to be used in games")
   flag.IntVar(&c.Timeout, "timeout", c.Timeout, "number of seconds to wait to timeout nodes/connections/etc")
   flag.StringVar(&c.Logdir, "logdir", c.Logdir, "The directory to store game logs (which are served from the UI)")
+
+  // -sensor 1:orangepi:gpiochip0:73:3
+  flag.Var(c.SensorsConf, "sensor", "Add a sensor in the form of -sensor one:orangepi:gpiochip0:73:13, <1-4>:<device>:<gpiochip>:<hitpin>:<ledpin>")
 
   flag.Parse()
 

@@ -17,7 +17,7 @@ type Config struct {
   EnableController        bool        `yaml:"enable_controller" json:"enable_controller"`
   EnableGameEngine        bool        `yaml:"enable_game_engine" json:"enable_game_engine"`
   EnableNode              bool        `yaml:"enable_node" json:"enable_node"`
-  EnableSensor            bool        `yaml:"enable_sensor" json:"enable_sensor"`
+  EnableSensors           bool        `yaml:"enable_sensors" json:"enable_sensors"`
   EnableSimulation        bool        `yaml:"enable_simulation" json:"enable_simulation"`
   EnableConnector         bool        `yaml:"enable_connector" json:"enable_connector"`
   Teams                   []string    `yaml:"teams" json:"teams"`
@@ -26,6 +26,7 @@ type Config struct {
   // serf config
   AgentConf               *agent.Config   `yaml:"-" json:"-"`
   SerfConf                *serf.Config    `yaml:"-" json:"-"`
+  SensorsConf             *SensorsConfig  `yaml:"sensors" json:"sensors"`
   Coalesce                bool            `yaml:"coalesce" json:"coalesce"`
   JoinAddrs               []string        `yaml:"join_addrs" json:"join_addrs"`
 
@@ -52,16 +53,17 @@ func NewConfig(logger *log.Logger) *Config {
     EnableController:   false,
     EnableGameEngine:   false,
     EnableNode:         false,
-    EnableSensor:       false,
+    EnableSensors:      false,
     EnableSimulation:   false,
     EnableConnector:    false,
     Teams:              []string{constants.BLUE_TEAM, constants.RED_TEAM, constants.YELLOW_TEAM, constants.GREEN_TEAM},
     Nodes:              []string{},
     AgentConf:          ac,
     SerfConf:           sc,
+    SensorsConf:        NewSensorsConfig(),
     Coalesce:           false,
     JoinAddrs:          strings.Split(joinaddrs, ","),
-    WinningScore:       100,
+    WinningScore:       10,
     GameLength:         "3m",
     Timeout:            10, // 10 second timeouts
     Logdir:             "./logs",

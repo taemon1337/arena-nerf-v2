@@ -57,7 +57,7 @@ func (g *GameSimulation) Start(parentctx context.Context) error {
       g.gamechan.RequestChan <- NewGameEvent(constants.GAME_ACTION_END, []byte("stopping game - context done"))
       return ctx.Err()
     case <-time.After(3 * time.Second):
-      g.gamechan.RequestChan <- NewGameEvent(constants.RANDOM_TEAM_HIT, []byte("simulating random game event"))
+      g.gamechan.RequestChan <- NewGameEvent(constants.RANDOM_SENSOR_HIT, []byte("simulating random sensor hit"))
     }
   }
 }

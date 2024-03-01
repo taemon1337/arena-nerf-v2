@@ -37,6 +37,9 @@ services:
     command:
       - "-enable-node"
       - "-enable-connector"
+      - "-enable-sensors"
+      - "-sensor"
+      - "test"
       - "-name"
       - "node1"
       - "-join"
@@ -55,6 +58,9 @@ services:
     command:
       - "-enable-node"
       - "-enable-connector"
+      - "-enable-sensors"
+      - "-sensor"
+      - "test"
       - "-name"
       - "node2"
       - "-join"
@@ -73,6 +79,9 @@ services:
     command:
       - "-enable-node"
       - "-enable-connector"
+      - "-enable-sensors"
+      - "-sensor"
+      - "test"
     environment:
       - SERF_NAME=node3
       - SERF_JOIN_ADDRS=arena:7946

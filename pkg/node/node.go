@@ -22,7 +22,7 @@ import (
 type Node struct {
   conf          *config.Config
   conn          *connector.Connector
-  sensor        *sensor.Sensor
+  sensors       map[string]*sensor.Sensor
   gamechan      *game.GameChannel
   nodestate     *NodeState
   *log.Logger
@@ -35,7 +35,7 @@ func NewNode(cfg *config.Config, gamechan *game.GameChannel, logger *log.Logger)
     conf:       cfg,
     conn:       connector.NewConnector(cfg, logger),
     gamechan:   gamechan,
-    sensor:     sensor.NewSensor(cfg, gamechan, logger),
+    sensors:    map[string]*sensor.Sensor{},
     nodestate:  NewNodeState(cfg.AgentConf.NodeName),
     Logger:     logger,
   }
@@ -59,17 +59,28 @@ func (n *Node) Start(ctx context.Context) error {
     })
   }
 
-  if n.conf.EnableSensor {
-    g.Go(func() error {
-      return n.sensor.Start(ctx)
-    })
+  if n.conf.EnableSensors {
+    for id, cfg := range n.conf.SensorsConf.Configs {
+      err := cfg.Error()
+      if err != nil && err != constants.ERR_TEST_SENSOR {
+        return err
+      }
+
+      n.Printf("starting sensor %s", id) 
+      g.Go(func() error {
+        s := sensor.NewSensor(cfg, n.gamechan, n.Logger)
+        return s.Start(ctx)
+      })
+    }
   } else {
-    n.Printf("sensor disabled")
+    n.Printf("sensors disabled")
   }
 
   g.Go(func() error {
     for {
       select {
+      case e := <-n.gamechan.GameChan:
+        n.Printf("node received game event: %s", e)
       case <-ctx.Done():
         n.Printf("stopping node")
         return ctx.Err()
@@ -82,6 +93,7 @@ func (n *Node) Start(ctx context.Context) error {
   return g.Wait()
 }
 
+// handle event are events from serf (over the network)
 func (n *Node) HandleEvent(evt serf.Event) {
   if evt.EventType() == serf.EventUser {
     e := evt.(serf.UserEvent)
@@ -98,6 +110,18 @@ func (n *Node) HandleEvent(evt serf.Event) {
       case constants.GAME_TEAMS:
         n.Printf("set game teams - %s", string(e.Payload))
         n.nodestate.SetTeams(string(e.Payload))
+      case n.NodeEventName(constants.SENSOR_HIT_REQUEST):
+        // sensor hits always come directly from sensors, not through the network
+        // so in this case, it is a synthetic hit and not a real one
+        n.Printf("synthetic sensor hit: %s", e.Name)
+        if n.nodestate.Status() != constants.GAME_STATUS_RUNNING {
+          n.Printf("game is not active - no hits allowed")
+          return
+        }
+        if err := n.SendEventToSensor(game.NewGameEvent(constants.SENSOR_HIT_REQUEST, e.Payload)); err != nil {
+          n.Printf("error sending sensor hit to sensor: %s", err)
+          return
+        }
       case n.NodeEventName(constants.TEAM_HIT):
         n.Printf("NODE EVENT: %s", e.Name)
         if n.nodestate.Status() != constants.GAME_STATUS_RUNNING {
@@ -154,3 +178,18 @@ func (n *Node) HandleEvent(evt serf.Event) {
 func (n *Node) NodeEventName(action string) string {
   return strings.Join([]string{n.conf.AgentConf.NodeName, action}, constants.SPLIT)
 }
+
+func (n *Node) SendEventToSensor(e game.GameEvent) error {
+  if !n.conf.EnableSensors {
+    return constants.ERR_SENSORS_DISABLED
+  }
+
+  if len(n.sensors) < 1 {
+    n.Printf("Sensors: %s", n.sensors)
+    return constants.ERR_NO_SENSORS
+  }
+
+  n.gamechan.SensorChan <- e
+  return nil
+}
+
