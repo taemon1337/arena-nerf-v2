@@ -2,72 +2,78 @@ package node
 
 import (
   "sync"
+  "strconv"
   "strings"
   "github.com/taemon1337/arena-nerf/pkg/constants"
 )
 
 type NodeState struct {
-  name          string          `yaml:"name" json:"name"`
-  status        string          `yaml:"status" json:"status"`
-  mode          string          `yaml:"mode" json:"mode"`
-  teams         []string        `yaml:"teams" json:"teams"`
-  hits          map[string]int  `yaml:"hits" json:"hits"`
+  Name          string          `yaml:"name" json:"name"`
+  Status        string          `yaml:"status" json:"status"`
+  Mode          string          `yaml:"mode" json:"mode"`
+  Teams         []string        `yaml:"teams" json:"teams"`
+  Colors        []string        `yaml:"colors" json:"colors"`
+  Hits          map[string]int  `yaml:"hits" json:"hits"`
   nodelock      *sync.Mutex     `yaml:"-" json:"-"`
 }
 
 func NewNodeState(name string) *NodeState {
   return &NodeState{
-    name:         name,
-    status:       constants.GAME_STATUS_INIT,
-    mode:         "",
-    teams:        []string{},
-    hits:         map[string]int{name: 0},
+    Name:         name,
+    Status:       constants.GAME_STATUS_INIT,
+    Mode:         "",
+    Teams:        []string{},
+    Colors:       []string{},
+    Hits:         map[string]int{name: 0},
     nodelock:     &sync.Mutex{},
   }
 }
 
-func (ns *NodeState) Status() string {
-  return ns.status
-}
-
-func (ns *NodeState) SetStatus(status string) {
-  ns.status = status
-}
-
-func (ns *NodeState) Hits() map[string]int {
-  return ns.hits
-}
-
-func (ns *NodeState) SetName(name string) {
+func (ns *NodeState) SetTeams(teams string, enable_team_colors bool) {
   ns.nodelock.Lock()
   defer ns.nodelock.Unlock()
-  ns.name = name
-}
-
-func (ns *NodeState) SetMode(mode string) {
-  ns.nodelock.Lock()
-  defer ns.nodelock.Unlock()
-  ns.mode = mode
-}
-
-func (ns *NodeState) SetTeams(teams string) {
-  ns.nodelock.Lock()
-  defer ns.nodelock.Unlock()
-  ns.teams = strings.Split(teams, constants.COMMA)
-}
-
-func (ns *NodeState) GetMode() string {
-  return ns.mode
-}
-
-func (ns *NodeState) AddTeamHit(team string, count int) {
-  if _, ok := ns.hits[team]; ok {
-    ns.hits[team] += count
-  } else {
-    ns.hits[team] = count
+  ns.Teams = strings.Split(teams, constants.COMMA)
+  if enable_team_colors {
+    ns.Colors = ns.Teams
   }
 }
 
-func (ns *NodeState) AddNodeHit(count int) {
-  ns.hits[ns.name] += count
+func (ns *NodeState) AddTeamHit(team string, count int) {
+  ns.AddNodeHit(constants.NONE_SENSOR_ID, team, count)
+}
+
+func (ns *NodeState) ParseNodeHitPayload(payload string) (string, string, int, error) {
+  parts := strings.Split(payload, constants.SPLIT)
+
+  // <sensor-id>:<sensor-color>:<hit-count>
+  if len(parts) != 3 {
+    return "", "", 0, constants.ERR_INVALID_NODE_HIT
+  }
+
+  sensorid := parts[0]
+  sensorcolor := parts[1]
+  hitcount, err := strconv.Atoi(parts[2])
+  if err != nil {
+    return "", "", 0, err
+  }
+
+  return sensorid, sensorcolor, hitcount, nil
+}
+
+func (ns *NodeState) AddNodeHit(sensorid, sensorcolor string, hitcount int) {
+  ns.nodelock.Lock()
+  defer ns.nodelock.Unlock()
+
+  // TODO: we should check if EnableTeamColors is set
+  if _, ok := ns.Hits[sensorid]; !ok {
+    ns.Hits[sensorid] = 0 // initialize
+  }
+
+  if _, ok := ns.Hits[sensorcolor]; !ok {
+    ns.Hits[sensorcolor] = 0 // initialize
+  }
+
+  ns.Hits[ns.Name] += hitcount // total node hits
+  ns.Hits[sensorid] += hitcount // total sensor hits
+  ns.Hits[sensorcolor] += hitcount // total team/color hits
 }

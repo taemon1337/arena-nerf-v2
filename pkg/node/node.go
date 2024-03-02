@@ -7,6 +7,7 @@ import (
   "strconv"
   "strings"
   "context"
+  "math/rand"
   "encoding/json"
 
   "golang.org/x/sync/errgroup"
@@ -66,10 +67,11 @@ func (n *Node) Start(ctx context.Context) error {
         return err
       }
 
+      n.sensors[id] = sensor.NewSensor(cfg, n.gamechan, n.Logger)
+
       n.Printf("starting sensor %s", id) 
       g.Go(func() error {
-        s := sensor.NewSensor(cfg, n.gamechan, n.Logger)
-        return s.Start(ctx)
+        return n.sensors[id].Start(ctx)
       })
     }
   } else {
@@ -80,7 +82,19 @@ func (n *Node) Start(ctx context.Context) error {
     for {
       select {
       case e := <-n.gamechan.GameChan:
-        n.Printf("node received game event: %s", e)
+        switch e.Event {
+          case constants.SENSOR_HIT:
+            sensorid, sensorcolor, hitcount, err := n.nodestate.ParseNodeHitPayload(string(e.Payload))
+            if err != nil {
+              n.Printf("error parsing node hit payload: %s", err)
+              continue
+            }
+
+            n.Printf("node received sensor hit: %s", e)
+            n.nodestate.AddNodeHit(sensorid, sensorcolor, hitcount)
+          default:
+            n.Printf("node received game event: %s", e)
+        }
       case <-ctx.Done():
         n.Printf("stopping node")
         return ctx.Err()
@@ -100,31 +114,66 @@ func (n *Node) HandleEvent(evt serf.Event) {
     switch e.Name {
       case constants.GAME_MODE:
         n.Printf("set game mode to %s", string(e.Payload))
-        n.nodestate.SetMode(string(e.Payload))
+        n.nodestate.Mode = string(e.Payload)
       case constants.GAME_ACTION_BEGIN:
         n.Printf("start game received")
-        n.nodestate.SetStatus(constants.GAME_STATUS_RUNNING)
+        n.nodestate.Status = constants.GAME_STATUS_RUNNING
       case constants.GAME_ACTION_END:
         n.Printf("end game received")
-        n.nodestate.SetStatus(constants.GAME_STATUS_ENDED)
+        n.nodestate.Status = constants.GAME_STATUS_ENDED
       case constants.GAME_TEAMS:
         n.Printf("set game teams - %s", string(e.Payload))
-        n.nodestate.SetTeams(string(e.Payload))
+        n.nodestate.SetTeams(string(e.Payload), n.conf.EnableTeamColors)
       case n.NodeEventName(constants.SENSOR_HIT_REQUEST):
         // sensor hits always come directly from sensors, not through the network
         // so in this case, it is a synthetic hit and not a real one
         n.Printf("synthetic sensor hit: %s", e.Name)
-        if n.nodestate.Status() != constants.GAME_STATUS_RUNNING {
+        if n.nodestate.Status != constants.GAME_STATUS_RUNNING {
           n.Printf("game is not active - no hits allowed")
           return
         }
-        if err := n.SendEventToSensor(game.NewGameEvent(constants.SENSOR_HIT_REQUEST, e.Payload)); err != nil {
-          n.Printf("error sending sensor hit to sensor: %s", err)
+
+        parts := strings.Split(string(e.Payload), constants.SPLIT)
+        if len(parts) != 2 {
+          n.Printf("error parsing sensor hit request: %s (should be <sensor-name>:<hit-count>)", string(e.Payload))
+          return
+        }
+
+        sensorid := parts[0]
+        hitcount := parts[1]
+
+        if err := n.SendEventToSensor(sensorid, game.NewGameEvent(constants.SENSOR_HIT, []byte(hitcount))); err != nil {
+          n.Printf("error sending event %s to sensor: %s", e.Name, err)
+          return
+        }
+      case n.NodeEventName(constants.SENSOR_COLOR_REQUEST):
+        n.Printf("node received sensor color request: %s", e.Name)
+        if n.nodestate.Status != constants.GAME_STATUS_RUNNING {
+          n.Printf("game is not active - cannot set random sensor color")
+          return
+        }
+
+        parts := strings.Split(string(e.Payload), constants.SPLIT)
+        if len(parts) != 2 {
+          n.Printf("error parsing sensor color request: %s (should be <sensor-name>:<color>)", string(e.Payload))
+          return
+        }
+
+        sensorid := parts[0]
+        color := parts[1]
+
+        if color == constants.RANDOM_SENSOR_ID {
+          currentcolor := n.sensors[sensorid].Led().GetColor()
+          color = n.RandomColor(currentcolor)
+        }
+
+        if err := n.SendEventToSensor(sensorid, game.NewGameEvent(constants.SENSOR_COLOR, []byte(color))); err != nil {
+          n.Printf("error sending event %s to sensor: %s", e.Name, err)
           return
         }
       case n.NodeEventName(constants.TEAM_HIT):
         n.Printf("NODE EVENT: %s", e.Name)
-        if n.nodestate.Status() != constants.GAME_STATUS_RUNNING {
+        if n.nodestate.Status != constants.GAME_STATUS_RUNNING {
           n.Printf("game is not active - no hits allowed")
           return
         }
@@ -138,7 +187,6 @@ func (n *Node) HandleEvent(evt serf.Event) {
             log.Printf("cannot parse team hit from %s - %s", string(e.Payload), err)
           } else {
             n.nodestate.AddTeamHit(parts[0], hits)
-            n.nodestate.AddNodeHit(hits)
 /*
             if n.HasSensor() {
               n.sensor.NodeTeamHit(constants.TEAM_HIT, e.Payload)
@@ -157,9 +205,9 @@ func (n *Node) HandleEvent(evt serf.Event) {
       case constants.NODE_READY:
         err = q.Respond([]byte(constants.NODE_IS_READY))
       case constants.GAME_MODE:
-        err = q.Respond([]byte(n.nodestate.GetMode()))
+        err = q.Respond([]byte(n.nodestate.Mode))
       case constants.NODE_SCOREBOARD:
-        data, err := json.Marshal(n.nodestate.Hits())
+        data, err := json.Marshal(n.nodestate.Hits)
         if err != nil {
           log.Printf("cannot marshal node hits: %s", err)
         } else {
@@ -179,17 +227,49 @@ func (n *Node) NodeEventName(action string) string {
   return strings.Join([]string{n.conf.AgentConf.NodeName, action}, constants.SPLIT)
 }
 
-func (n *Node) SendEventToSensor(e game.GameEvent) error {
+func (n *Node) SendEventToSensor(sensorid string, e game.GameEvent) error {
   if !n.conf.EnableSensors {
     return constants.ERR_SENSORS_DISABLED
   }
 
   if len(n.sensors) < 1 {
-    n.Printf("Sensors: %s", n.sensors)
     return constants.ERR_NO_SENSORS
   }
 
-  n.gamechan.SensorChan <- e
+  if sensorid == constants.RANDOM_SENSOR_ID {
+    sensorid = n.RandomSensorId()
+  }
+
+  if _, ok := n.sensors[sensorid]; !ok {
+    return constants.ERR_NO_SENSOR_BY_NAME
+  }
+
+  n.sensors[sensorid].Sensorchan <- e
   return nil
 }
 
+func (n *Node) RandomSensorId() string {
+  i := rand.Intn(len(n.sensors))
+  p := 0
+
+  for id, _ := range n.sensors {
+    if p == i {
+      return id
+    }
+    p += 1
+  }
+
+  return ""
+}
+
+func (n *Node) RandomColor(color string) string {
+  if len(n.nodestate.Colors) == 0 {
+    return ""
+  }
+
+  if len(n.nodestate.Colors) == 1 {
+    return n.nodestate.Colors[0]
+  }
+
+  return n.nodestate.Colors[rand.Intn(len(n.nodestate.Colors))]
+}

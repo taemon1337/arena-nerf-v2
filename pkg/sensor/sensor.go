@@ -11,17 +11,23 @@ import (
   "github.com/taemon1337/arena-nerf/pkg/game"
 )
 
+// https://github.com/hybridgroup/gobot/blob/release/drivers/gpio/rgb_led_driver.go
+
 type Sensor struct {
   conf          *config.SensorConfig
   gamechan      *game.GameChannel
+  Sensorchan    chan game.GameEvent
+  led           *SensorLed
   *log.Logger
 }
 
 func NewSensor(cfg *config.SensorConfig, gamechan *game.GameChannel, logger *log.Logger) *Sensor {
   return &Sensor{
-    conf:     cfg,
-    gamechan: gamechan,
-    Logger:   log.New(logger.Writer(), "[SENSOR]: ", logger.Flags()),
+    conf:         cfg,
+    gamechan:     gamechan,
+    Sensorchan:   make(chan game.GameEvent, 5),
+    led:          NewSensorLed(constants.COLOR_YELLOW),
+    Logger:   log.New(logger.Writer(), fmt.Sprintf("[sensor:%s]: ", cfg.Id), logger.Flags()),
   }
 }
 
@@ -29,23 +35,14 @@ func (s *Sensor) Start(ctx context.Context) error {
   s.Printf("starting sensor")
   for {
     select {
-    case evt := <-s.gamechan.SensorChan:
-      s.Printf("sensor received game event: %s", evt)
+    case evt := <-s.Sensorchan:
       switch evt.Event {
-        case constants.SENSOR_HIT_REQUEST:
-          parts := strings.Split(string(evt.Payload), constants.SPLIT)
-          if len(parts) != 2 {
-            s.Printf("error parsing sensor hit request: %s (should be <1-4>:<num>)", string(evt.Payload))
-            continue
-          }
-
-          if parts[0] == "1" || parts[0] == "2" || parts[0] == "3" || parts[0] == "4" {
-            s.Printf("generating sensor hit by request: %s", evt)
-            s.SensorHit(parts[0])
-          } else {
-            s.Printf("error parsing sensor hit request: %s (should be <1-4>:<num>)", string(evt.Payload))
-            continue
-          }
+        case constants.SENSOR_HIT:
+          s.Printf("sensor received sensor hit game event: %s", evt)
+          s.SensorHit(s.conf.Id)
+        case constants.SENSOR_COLOR:
+          s.Printf("sensor received sensor color game event: %s", evt)
+          s.led.SetColor(string(evt.Payload))
         default:
           s.Printf("unrecognized sensor event: %s", evt)
       }
@@ -59,10 +56,14 @@ func (s *Sensor) Start(ctx context.Context) error {
 }
 
 func (s *Sensor) SensorHit(sensorid string) {
-  pay := fmt.Sprintf("%s%s1", sensorid, constants.SPLIT) // sensor hits are always a single hit, 1
+  pay := strings.Join([]string{sensorid, s.led.GetColor(), "1"}, constants.SPLIT)
   s.gamechan.GameChan <- game.NewGameEvent(constants.SENSOR_HIT, []byte(pay))
 }
 
 func (s *Sensor) IsTestSensor() bool {
   return strings.HasPrefix(s.conf.Id, constants.TEST_SENSOR_PREFIX)
+}
+
+func (s *Sensor) Led() *SensorLed {
+  return s.led
 }

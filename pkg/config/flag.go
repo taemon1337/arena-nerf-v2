@@ -2,6 +2,7 @@ package config
 
 import (
   "flag"
+  "slices"
   "github.com/taemon1337/arena-nerf/pkg/constants"
 )
 
@@ -14,6 +15,7 @@ func (c *Config) Flags() error {
   flag.BoolVar(&c.EnableSensors, "enable-sensors", c.EnableSensors, "enables sensors on this node")
   flag.BoolVar(&c.EnableSimulation, "enable-simulation", c.EnableSimulation, "enables game simulation")
   flag.BoolVar(&c.EnableConnector, "enable-connector", c.EnableConnector, "enables clustering with other nodes")
+  flag.BoolVar(&c.EnableTeamColors, "enable-team-colors", c.EnableTeamColors, "if set, all teams are also used as sensor led colors")
 
   flag.StringVar(&c.AgentConf.NodeName, "name", c.AgentConf.NodeName, "name of this node in the cluster")
   flag.StringVar(&c.AgentConf.BindAddr, "bind", c.AgentConf.BindAddr, "address to bind listeners to")
@@ -24,6 +26,7 @@ func (c *Config) Flags() error {
   flag.Var((*AppendSliceValue)(&c.JoinAddrs), "join", "addresses to try to join automatically and repeatable until success")
   flag.Var((*AppendSliceValue)(&c.Nodes), "node", "add expected node by name, games will wait until all expected nodes are ready")
   flag.Var((*AppendSliceValue)(&c.Teams), "team", "add teams to be used in games")
+  flag.Var((*AppendSliceValue)(&c.Colors), "color", "add color to available colors for LEDs")
   flag.IntVar(&c.Timeout, "timeout", c.Timeout, "number of seconds to wait to timeout nodes/connections/etc")
   flag.StringVar(&c.Logdir, "logdir", c.Logdir, "The directory to store game logs (which are served from the UI)")
 
@@ -49,6 +52,14 @@ func (c *Config) Flags() error {
 
   if c.EnableNode {
     c.AgentConf.Tags[constants.TAG_NODE] = constants.TAG_TRUE
+  }
+
+  if c.EnableTeamColors {
+    for _, team := range c.Teams {
+      if !slices.Contains(c.Colors, team) {
+        c.Colors = append(c.Colors, team)
+      }
+    }
   }
 
   if err := c.Validate(); err != nil {

@@ -5,7 +5,6 @@ type GameChannel struct {
   GameChan      chan GameEvent  // game chan are events being sent from GameEngine to Game
   NodeChan      chan GameEvent  // node chan are events being sent from GameEngine to Nodes (over network)
   QueryChan     chan GameQuery  // query chan are sent to all nodes and blocks until all responses received
-  SensorChan    chan GameEvent  // game events sent to sensor
 }
 
 func NewGameChannel() *GameChannel {
@@ -14,6 +13,5 @@ func NewGameChannel() *GameChannel {
     GameChan:       make(chan GameEvent, 5),
     NodeChan:       make(chan GameEvent, 5),
     QueryChan:      make(chan GameQuery, 5),
-    SensorChan:     make(chan GameEvent, 5),
   }
 }

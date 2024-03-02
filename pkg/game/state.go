@@ -16,6 +16,7 @@ type GameState struct {
   Status            string          `yaml:"status" json:"status"`
   Teams             []string        `yaml:"teams" json:"teams"`
   Nodes             []string        `yaml:"nodes" json:"nodes"`
+  Colors            []string        `yaml:"colors" json:"colors"`
   Scoreboard        map[string]int  `yaml:"scoreboard" json:"scoreboard"`
   Nodeboard         map[string]int  `yaml:"nodeboard" json:"nodeboard"`
   Winner            string          `yaml:"winner" json:"winner"`
@@ -24,6 +25,8 @@ type GameState struct {
   GameDuration      time.Duration   `yaml:"GameDuration" json:"GameDuration"`
   EndedAt           time.Time       `yaml:"EndedAt" json:"EndedAt"`
   Timeline          []GameEvent     `yaml:"timeline" json:"timeline"`
+  Lastcheck         time.Time       `yaml:"last_check" json:"last_check"`
+  checking          bool            `yaml:"-" json:"-"`
   gamelock          *sync.Mutex     `yaml:"-" json:"-"`
 }
 
@@ -36,9 +39,12 @@ func NewGameState(cfg *GameConfig) *GameState {
     GameDuration:   0,
     Teams:          cfg.Cfg.Teams,
     Nodes:          cfg.Cfg.Nodes,
+    Colors:         cfg.Cfg.Colors,
     Scoreboard:     map[string]int{},
     Nodeboard:      map[string]int{},
     Timeline:       make([]GameEvent, 0),
+    Lastcheck:      time.Time{},
+    checking:       false,
     gamelock:       &sync.Mutex{},
   }
 }
@@ -109,6 +115,18 @@ func (gs *GameState) SetBoards(sb, nb map[string]int) {
   defer gs.gamelock.Unlock()
   gs.Scoreboard = sb
   gs.Nodeboard = nb
+  gs.Lastcheck = time.Now()
+  gs.checking = false
+}
+
+func (gs *GameState) Checking() bool {
+  return gs.checking
+}
+
+func (gs *GameState) SetChecking(val bool) {
+  gs.gamelock.Lock()
+  defer gs.gamelock.Unlock()
+  gs.checking = val
 }
 
 func (gs *GameState) TeamList() string {
@@ -118,6 +136,14 @@ func (gs *GameState) TeamList() string {
 func (gs *GameState) RandomTeam() string {
   if len(gs.Teams) > 0 {
     return gs.Teams[rand.Intn(len(gs.Teams))]
+  } else {
+    return ""
+  }
+}
+
+func (gs *GameState) RandomColor() string {
+  if len(gs.Colors) > 0 {
+    return gs.Colors[rand.Intn(len(gs.Colors))]
   } else {
     return ""
   }
@@ -203,10 +229,15 @@ func (gs *GameState) WinningScoreReached() bool {
 }
 
 func (gs *GameState) GameStatus() string {
-  s := "###################################\n"
-  s += fmt.Sprintf("Game Status: (%s)", gs.Status)
-  s += fmt.Sprintf("Time Remaining: %s", gs.GameDuration - time.Since(gs.StartedAt))
-  s += fmt.Sprintf("Scoreboard: \n%s", gs.Scoreboard)
+  timeleft := gs.GameDuration - time.Since(gs.StartedAt)
+  if timeleft < 0 {
+    timeleft = 0
+  }
+  s := "\n\n###################################\n"
+  s += fmt.Sprintf("Game Status: (%s)\n", gs.Status)
+  s += fmt.Sprintf("Time Remaining: %s\n", timeleft)
+  s += fmt.Sprintf("Scoreboard: \n%s\n\n", gs.Scoreboard)
+  s += fmt.Sprintf("Nodeboard: \n%s\n\n", gs.Nodeboard)
   return s
 }
 

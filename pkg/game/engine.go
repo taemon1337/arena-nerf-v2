@@ -103,6 +103,21 @@ func (ge *GameEngine) Start(ctx context.Context) error {
         }
       }
 
+      if time.Since(ge.CurrentGameState.Lastcheck) > (10 * time.Second) {
+        if !ge.CurrentGameState.Checking() {
+          ge.Printf("checking on scores")
+          ge.CurrentGameState.SetChecking(true)
+
+          scoreboard, nodeboard, err := ge.GetScoreboard()
+          if err != nil {
+            ge.Printf("error compiling node scores: %s", err)
+            return err
+          }
+
+          ge.CurrentGameState.SetBoards(scoreboard, nodeboard)
+        }
+      }
+
       if ge.CurrentGameState.WinningScoreReached() {
         ge.Printf("the winning score has been reached, ending game")
         if err := ge.EndGame(); err != nil {
@@ -132,6 +147,14 @@ func (ge *GameEngine) Start(ctx context.Context) error {
           if ge.GameInProgress() {
             if err := ge.RandomTeamHit(rand.Intn(5)+1); err != nil {
               ge.Printf("cannot generate random team hit: %s", err)
+            }
+          } else {
+            ge.Printf("game engine received request when no game in progress")
+          }
+        case constants.RANDOM_SENSOR_COLOR:
+          if ge.GameInProgress() {
+            if err := ge.RandomSensorColor(); err != nil {
+              ge.Printf("cannot generate random team color: %s", err)
             }
           } else {
             ge.Printf("game engine received request when no game in progress")
@@ -305,6 +328,8 @@ func (ge *GameEngine) GetScoreboard() (map[string]int, map[string]int, error) {
     return scoreboard, nodeboard, err
   }
 
+  ge.Printf("SCOREBOARDS: %s", resp)
+
   // accumulate each node response
   for node, val := range resp {
     nodehits := map[string]int{}
@@ -386,11 +411,24 @@ func (ge *GameEngine) RandomTeamHit(hits int) error {
 
 func (ge *GameEngine) RandomSensorHit(hits int) error {
   node := ge.CurrentGameState.RandomNode()
-  sensornumber := rand.Intn(4) + 1 // 1-4
+  sensorid := constants.RANDOM_SENSOR_ID
   evt := strings.Join([]string{node, constants.SENSOR_HIT_REQUEST}, constants.SPLIT)
-  pay := fmt.Sprintf("%s%s%d", sensornumber, constants.SPLIT, hits)
+  pay := fmt.Sprintf("%s%s%d", sensorid, constants.SPLIT, hits)
   if err := ge.SendEventToNodes(NewGameEvent(evt, []byte(pay))); err != nil {
-    ge.Printf("error sending random sensor hit %s: %s", sensornumber, err)
+    ge.Printf("error sending random sensor hit %s: %s", sensorid, err)
+    return err
+  }
+
+  return nil
+}
+
+func (ge *GameEngine) RandomSensorColor() error {
+  node := ge.CurrentGameState.RandomNode()
+  sensorid := constants.RANDOM_SENSOR_ID
+  evt := strings.Join([]string{node, constants.SENSOR_COLOR_REQUEST}, constants.SPLIT)
+  pay := strings.Join([]string{sensorid, constants.RANDOM_COLOR_ID}, constants.SPLIT)
+  if err := ge.SendEventToNodes(NewGameEvent(evt, []byte(pay))); err != nil {
+    ge.Printf("error sending random sensor color %s: %s", sensorid, err)
     return err
   }
 

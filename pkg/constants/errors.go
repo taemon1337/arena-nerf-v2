@@ -13,4 +13,5 @@ var (
   ERR_MAX_TEAM_COUNT = errors.New("too many teams")
   ERR_REQUIRED_NODE = errors.New("missing required node")
   ERR_REQUIRED_TEAM = errors.New("missing required team")
+  ERR_INVALID_NODE_HIT = errors.New("invalid node hit payload - must be <sensor-id>:<sensor-color>:<hit-count>")
 )
