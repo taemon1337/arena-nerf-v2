@@ -163,8 +163,17 @@ func (n *Node) HandleEvent(evt serf.Event) {
         color := parts[1]
 
         if color == constants.RANDOM_SENSOR_ID {
-          currentcolor := n.sensors[sensorid].Led().GetColor()
-          color = n.RandomColor(currentcolor)
+          if _, ok := n.sensors[sensorid]; !ok {
+            n.Printf("no sensor found named %s on this node", sensorid)
+            return
+          }
+
+          sensor := n.sensors[sensorid]
+          led := sensor.Led()
+          if led != nil {
+            currentcolor := led.GetColor()
+            color = n.RandomColor(currentcolor)
+          }
         }
 
         if err := n.SendEventToSensor(sensorid, game.NewGameEvent(constants.SENSOR_COLOR, []byte(color))); err != nil {
@@ -262,7 +271,7 @@ func (n *Node) RandomSensorId() string {
   return ""
 }
 
-func (n *Node) RandomColor(color string) string {
+func (n *Node) RandomColor(except_color string) string {
   if len(n.nodestate.Colors) == 0 {
     return ""
   }
@@ -271,5 +280,12 @@ func (n *Node) RandomColor(color string) string {
     return n.nodestate.Colors[0]
   }
 
-  return n.nodestate.Colors[rand.Intn(len(n.nodestate.Colors))]
+  availableColors := []string{}
+  for _, color := range n.nodestate.Colors {
+    if color != except_color {
+      availableColors = append(availableColors, color)
+    }
+  }
+
+  return availableColors[rand.Intn(len(availableColors))]
 }
