@@ -4,11 +4,11 @@ VERSION ?= 2.0.1
 build:
 	go build .
 
+armbuild:
+	GOOS=linux GOARCH=arm64 go build -o arena-nerf.arm64
+
 run:
 	./arena-nerf -enable-controller -enable-game-engine -enable-node -enable-sensor -enable-simulation -enable-connector -name test
-
-pibuild:
-	GOOS=linux GOARCH=arm64 go build -o arena-nerf.arm64
 
 docker-build:
 	docker build -t ${IMAGE}:${VERSION} .

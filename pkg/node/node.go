@@ -69,7 +69,6 @@ func (n *Node) Start(ctx context.Context) error {
 
       n.sensors[id] = sensor.NewSensor(cfg, n.gamechan, n.Logger)
 
-      n.Printf("starting sensor %s", id) 
       g.Go(func() error {
         return n.sensors[id].Start(ctx)
       })

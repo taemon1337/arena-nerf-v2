@@ -36,7 +36,7 @@ func NewSensor(cfg *config.SensorConfig, gamechan *game.GameChannel, logger *log
 }
 
 func (s *Sensor) Start(parentctx context.Context) error {
-  s.Printf("starting sensor")
+  s.Printf("starting sensor %s", s.conf.Id)
   g, ctx := errgroup.WithContext(parentctx)
 
   if !s.IsTestSensor() {
@@ -61,7 +61,7 @@ func (s *Sensor) Start(parentctx context.Context) error {
             s.Printf("unrecognized sensor event: %s", evt)
         }
       case <-ctx.Done():
-        s.Printf("stopping sensor")
+        s.Printf("stopping sensor %s", s.conf.Id)
         return ctx.Err()
       default:
         time.Sleep(3 * time.Second) // do something later

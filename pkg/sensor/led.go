@@ -28,6 +28,7 @@ func NewSensorLed(cfg *config.SensorConfig) *SensorLed {
 func (led *SensorLed) Connect() error {
   ledpin, err := ParseGpioPin(led.conf.Device, led.conf.Ledpin)
   if err != nil {
+    log.Printf("cannot parse gpio led pin %s: %s", ledpin, err)
     return err
   }
 

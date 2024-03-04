@@ -2,6 +2,7 @@ package config
 
 import (
   "fmt"
+  "log"
   "strings"
   "gopkg.in/yaml.v2"
   "github.com/taemon1337/arena-nerf/pkg/constants"
@@ -73,15 +74,18 @@ func (sc *SensorConfig) Error() error {
 
 func (sc *SensorsConfig) Set(value string) error {
   parts := strings.Split(value, constants.SPLIT)
-  if strings.HasPrefix(value, constants.TEST_SENSOR_PREFIX) {
-    sc.Configs[value] = DefaultSensorConfig(value)
+  id := parts[0]
+  log.Printf("parsing sensor %s", value)
+
+  if strings.HasPrefix(id, constants.TEST_SENSOR_PREFIX) {
+    sc.Configs[id] = DefaultSensorConfig(id)
     return nil
   }
+
   if len(parts) != 5 {
     return constants.ERR_INVALID_SENSOR_FLAG
   }
 
-  id := parts[0]
   dev := parts[1]
   chip := parts[2]
   hit := parts[3]
