@@ -1,19 +1,55 @@
 package sensor
 
 import (
+  "log"
   "sync"
+  "time"
+  "github.com/taemon1337/gpiod"
+  "github.com/taemon1337/arena-nerf/pkg/constants"
+  "github.com/taemon1337/arena-nerf/pkg/config"
 )
 
 type SensorLed struct {
-  color         string          `yaml:"color" json:"color"`
-  lock          *sync.Mutex     `yaml:"-" json:"-"`
+  conf          *config.SensorConfig    `yaml:"config" json:"config"`
+  color         string                  `yaml:"color" json:"color"`
+  line          *gpiod.Line             `yaml:"-" json:"-"`
+  lock          *sync.Mutex             `yaml:"-" json:"-"`
 }
 
-func NewSensorLed(color string) *SensorLed {
+func NewSensorLed(cfg *config.SensorConfig) *SensorLed {
   return &SensorLed{
-    color:    color,
+    conf:     cfg,
+    color:    "",
+    line:     nil,
     lock:     &sync.Mutex{},
   }
+}
+
+func (led *SensorLed) Connect() error {
+  ledpin, err := ParseGpioPin(led.conf.Device, led.conf.Ledpin)
+  if err != nil {
+    return err
+  }
+
+  ledline, err := gpiod.RequestLine(led.conf.Gpiochip, ledpin, gpiod.AsOutput(constants.OFF))
+  if err != nil {
+    log.Printf("cannot request gpiod %d led line: %s", ledpin, err)
+    return err
+  }
+
+  led.line = ledline
+
+  // start by blinking led
+  log.Printf("Blinking LED 5 times...")
+  time.Sleep(3 * time.Second)
+  led.Blink(5)
+  time.Sleep(1 * time.Second)
+  return nil
+}
+
+func (led *SensorLed) Close() {
+  led.line.Reconfigure(gpiod.AsInput)
+  led.line.Close()
 }
 
 func (led *SensorLed) SetColor(color string) {
@@ -24,4 +60,19 @@ func (led *SensorLed) SetColor(color string) {
 
 func (led *SensorLed) GetColor() string {
   return led.color
+}
+
+func (led *SensorLed) Blink(times int) {
+  for i := 0; i < times; i++ {
+    led.BlinkOnce()
+    time.Sleep(constants.BLINK_DELAY)
+  }
+}
+
+func (led *SensorLed) BlinkOnce() {
+  if led.line != nil {
+    led.line.SetValue(constants.ON)
+    time.Sleep(constants.BLINK_DELAY)
+    led.line.SetValue(constants.OFF)
+  }
 }

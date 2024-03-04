@@ -1,5 +1,9 @@
 package game
 
+import (
+  "github.com/taemon1337/arena-nerf/pkg/constants"
+)
+
 type GameChannel struct {
   RequestChan   chan GameEvent  // request chan are events being requested to occur (normally from Game to GameEngine)
   GameChan      chan GameEvent  // game chan are events being sent from GameEngine to Game
@@ -9,9 +13,9 @@ type GameChannel struct {
 
 func NewGameChannel() *GameChannel {
   return &GameChannel{
-    RequestChan:    make(chan GameEvent, 5),
-    GameChan:       make(chan GameEvent, 5),
-    NodeChan:       make(chan GameEvent, 5),
-    QueryChan:      make(chan GameQuery, 5),
+    RequestChan:    make(chan GameEvent, constants.CHANNEL_WIDTH),
+    GameChan:       make(chan GameEvent, constants.CHANNEL_WIDTH),
+    NodeChan:       make(chan GameEvent, constants.CHANNEL_WIDTH),
+    QueryChan:      make(chan GameQuery, constants.CHANNEL_WIDTH),
   }
 }

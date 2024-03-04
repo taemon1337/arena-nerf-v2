@@ -328,8 +328,6 @@ func (ge *GameEngine) GetScoreboard() (map[string]int, map[string]int, error) {
     return scoreboard, nodeboard, err
   }
 
-  ge.Printf("SCOREBOARDS: %s", resp)
-
   // accumulate each node response
   for node, val := range resp {
     nodehits := map[string]int{}
@@ -360,7 +358,6 @@ func (ge *GameEngine) GetScoreboard() (map[string]int, map[string]int, error) {
         if !isteam && !isnode {
           msg := fmt.Sprintf("unrecognized team|node %s found in response from node %s", key, node)
           ge.Printf(msg)
-          //ge.GameStats.Events = append(ge.GameStats.Events, msg)
         }
       }
     }
@@ -372,7 +369,7 @@ func (ge *GameEngine) GetScoreboard() (map[string]int, map[string]int, error) {
 
 func (ge *GameEngine) SendEventToGame(e GameEvent) error {
   ge.gamechan.GameChan <- e
-//  ge.GameStats.Events = append(ge.GameStats.Events, e.String())
+  ge.CurrentGameState.LogGameEvent(e)
   return nil
 }
 

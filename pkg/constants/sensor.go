@@ -19,5 +19,6 @@ var (
   ERR_INVALID_SENSOR_FLAG = errors.New("invalid -sensor flag; expects <1-4>:<device>:<gpiochip>:<hit-pin>:<led-pin>")
   ERR_INVALID_SENSOR_NUMBER = errors.New("invalid -sensor <number>, must be 1-4")
   ERR_TEST_SENSOR = errors.New("sensor is a test only sensor")
+  ERR_SENSOR_HIT_STOPPED = errors.New("a sensor hit input has stopped")
 )
 

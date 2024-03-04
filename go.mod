@@ -5,6 +5,7 @@ go 1.21.5
 require (
 	github.com/google/uuid v1.6.0
 	github.com/hashicorp/serf v0.10.1
+	github.com/taemon1337/gpiod v0.0.0-20240220180906-08a014cf2579
 	golang.org/x/sync v0.6.0
 	gopkg.in/yaml.v2 v2.2.2
 )
@@ -34,5 +35,5 @@ require (
 	github.com/posener/complete v1.2.3 // indirect
 	github.com/sean-/seed v0.0.0-20170313163322-e2103e2c3529 // indirect
 	golang.org/x/net v0.0.0-20210410081132-afb366fc7cd1 // indirect
-	golang.org/x/sys v0.0.0-20220728004956-3c1f35247d10 // indirect
+	golang.org/x/sys v0.10.0 // indirect
 )

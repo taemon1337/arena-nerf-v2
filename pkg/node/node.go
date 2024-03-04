@@ -162,7 +162,11 @@ func (n *Node) HandleEvent(evt serf.Event) {
         sensorid := parts[0]
         color := parts[1]
 
-        if color == constants.RANDOM_SENSOR_ID {
+        if sensorid == constants.RANDOM_SENSOR_ID {
+          sensorid = n.RandomSensorId()
+        }
+
+        if color == constants.RANDOM_COLOR_ID {
           if _, ok := n.sensors[sensorid]; !ok {
             n.Printf("no sensor found named %s on this node", sensorid)
             return
@@ -253,7 +257,7 @@ func (n *Node) SendEventToSensor(sensorid string, e game.GameEvent) error {
     return constants.ERR_NO_SENSOR_BY_NAME
   }
 
-  n.sensors[sensorid].Sensorchan <- e
+  n.sensors[sensorid].SensorChan <- e
   return nil
 }
 
