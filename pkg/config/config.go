@@ -14,6 +14,7 @@ import (
 )
 
 type Config struct {
+  NodeName                string      `yaml:"node_name" json:"node_name"`
   EnableController        bool        `yaml:"enable_controller" json:"enable_controller"`
   EnableGameEngine        bool        `yaml:"enable_game_engine" json:"enable_game_engine"`
   EnableNode              bool        `yaml:"enable_node" json:"enable_node"`
@@ -38,6 +39,7 @@ type Config struct {
 
   Timeout                 int             `yaml:"timeout" json:"timeout"`
   Logdir                  string          `yaml:"logdir" json:"logdir"`
+  ConfigFile              string          `yaml:"config_file" json:"config_file"`
   *log.Logger                             `yaml:"-" json:"-"`
 }
 
@@ -45,13 +47,15 @@ func NewConfig(logger *log.Logger) *Config {
   ac := agent.DefaultConfig()
   sc := serf.DefaultConfig()
   joinaddrs := Getenv("SERF_JOIN_ADDRS", "127.0.0.1")
-  ac.NodeName = Getenv("SERF_NAME", GetHostname())
+  nodename := Getenv("SERF_NAME", GetHostname())
+  ac.NodeName = nodename
   ac.BindAddr = Getenv("SERF_BIND_ADDR", "0.0.0.0")
   ac.AdvertiseAddr = Getenv("SERF_ADVERTISE_ADDR", "")
   ac.EncryptKey = Getenv("SERF_ENCRYPT_KEY", "")
   ac.LogLevel = Getenv("SERF_LOG_LEVEL", "err")
 
   return &Config{
+    NodeName:           nodename,
     EnableController:   false,
     EnableGameEngine:   false,
     EnableNode:         false,
@@ -70,7 +74,8 @@ func NewConfig(logger *log.Logger) *Config {
     WinningScore:       10,
     GameLength:         "3m",
     Timeout:            10, // 10 second timeouts
-    Logdir:             "./logs",
+    ConfigFile:         "",
+    Logdir:             "/data/logs",
     Logger:             log.New(logger.Writer(), "[CONFIG]: ", logger.Flags()),
   }
 }

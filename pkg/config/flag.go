@@ -9,6 +9,7 @@ import (
 func (c *Config) Flags() error {
   var tags []string
 
+  flag.StringVar(&c.ConfigFile, "config-file", c.ConfigFile, "path to read/write config yaml to")
   flag.BoolVar(&c.EnableController, "enable-controller", c.EnableController, "enables the controller")
   flag.BoolVar(&c.EnableGameEngine, "enable-game-engine", c.EnableGameEngine, "enables the game engine on the controller")
   flag.BoolVar(&c.EnableNode, "enable-node", c.EnableNode, "enables the node")
@@ -17,7 +18,7 @@ func (c *Config) Flags() error {
   flag.BoolVar(&c.EnableConnector, "enable-connector", c.EnableConnector, "enables clustering with other nodes")
   flag.BoolVar(&c.EnableTeamColors, "enable-team-colors", c.EnableTeamColors, "if set, all teams are also used as sensor led colors")
 
-  flag.StringVar(&c.AgentConf.NodeName, "name", c.AgentConf.NodeName, "name of this node in the cluster")
+  flag.StringVar(&c.NodeName, "name", c.NodeName, "name of this node in the cluster")
   flag.StringVar(&c.AgentConf.BindAddr, "bind", c.AgentConf.BindAddr, "address to bind listeners to")
   flag.StringVar(&c.AgentConf.AdvertiseAddr, "advertise", c.AgentConf.AdvertiseAddr, "address to advertise to cluster")
   flag.StringVar(&c.AgentConf.EncryptKey, "encrypt", c.AgentConf.EncryptKey, "encryption key")
@@ -40,6 +41,15 @@ func (c *Config) Flags() error {
     return err
   }
 
+  if c.HasConfig() {
+    c.Printf("reading config from %s", c.ConfigFile)
+    if err := c.LoadConfig(); err != nil {
+      c.Printf("error reading config file: %s", c.ConfigFile)
+      return err
+    }
+  }
+
+  c.AgentConf.NodeName = c.NodeName
   c.AgentConf.Tags = parsedtags
 
   if c.EnableNode {
@@ -64,6 +74,14 @@ func (c *Config) Flags() error {
 
   if err := c.Validate(); err != nil {
     return err
+  }
+
+  if c.ConfigFile != "" {
+    c.Printf("saving config to %s", c.ConfigFile)
+    if err := c.SaveConfig(); err != nil {
+      c.Printf("error saving config file: %s", err)
+      return err
+    }
   }
 
   return nil

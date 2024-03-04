@@ -4,7 +4,6 @@ import (
   "log"
   "fmt"
   "time"
-  "strconv"
   "strings"
   "context"
   "math/rand"
@@ -13,6 +12,7 @@ import (
   "golang.org/x/sync/errgroup"
   "github.com/hashicorp/serf/serf"
 
+  "github.com/taemon1337/arena-nerf/pkg/common"
   "github.com/taemon1337/arena-nerf/pkg/config"
   "github.com/taemon1337/arena-nerf/pkg/constants"
   "github.com/taemon1337/arena-nerf/pkg/connector"
@@ -84,7 +84,7 @@ func (n *Node) Start(ctx context.Context) error {
       case e := <-n.gamechan.GameChan:
         switch e.Event {
           case constants.SENSOR_HIT:
-            sensorid, sensorcolor, hitcount, err := n.nodestate.ParseNodeHitPayload(string(e.Payload))
+            sensorid, sensorcolor, hitcount, err := common.ParseNodeHitPayload(e.Payload)
             if err != nil {
               n.Printf("error parsing node hit payload: %s", err)
               continue
@@ -195,17 +195,13 @@ func (n *Node) HandleEvent(evt serf.Event) {
         if len(parts) < 2 {
           log.Printf("cannot parse team hit from %s - should be <team>:<count>", string(e.Payload))
         } else {
-          hits, err := strconv.Atoi(parts[1])
+          team, hits, err := common.ParseTeamHit(e.Payload)
           if err != nil {
-            log.Printf("cannot parse team hit from %s - %s", string(e.Payload), err)
-          } else {
-            n.nodestate.AddTeamHit(parts[0], hits)
-/*
-            if n.HasSensor() {
-              n.sensor.NodeTeamHit(constants.TEAM_HIT, e.Payload)
-            }
-*/
+            n.Printf("error parsing team hit event %s: %s", e.Name, err)
+            return
           }
+
+          n.nodestate.AddTeamHit(team, hits)
         }
       default:
         n.Printf("unrecognized event - %s", e.Name)

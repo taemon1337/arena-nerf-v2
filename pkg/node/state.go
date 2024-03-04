@@ -2,7 +2,6 @@ package node
 
 import (
   "sync"
-  "strconv"
   "strings"
   "github.com/taemon1337/arena-nerf/pkg/constants"
 )
@@ -40,24 +39,6 @@ func (ns *NodeState) SetTeams(teams string, enable_team_colors bool) {
 
 func (ns *NodeState) AddTeamHit(team string, count int) {
   ns.AddNodeHit(constants.NONE_SENSOR_ID, team, count)
-}
-
-func (ns *NodeState) ParseNodeHitPayload(payload string) (string, string, int, error) {
-  parts := strings.Split(payload, constants.SPLIT)
-
-  // <sensor-id>:<sensor-color>:<hit-count>
-  if len(parts) != 3 {
-    return "", "", 0, constants.ERR_INVALID_NODE_HIT
-  }
-
-  sensorid := parts[0]
-  sensorcolor := parts[1]
-  hitcount, err := strconv.Atoi(parts[2])
-  if err != nil {
-    return "", "", 0, err
-  }
-
-  return sensorid, sensorcolor, hitcount, nil
 }
 
 func (ns *NodeState) AddNodeHit(sensorid, sensorcolor string, hitcount int) {
