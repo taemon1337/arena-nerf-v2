@@ -132,16 +132,13 @@ func (n *Node) HandleEvent(evt serf.Event) {
           return
         }
 
-        parts := strings.Split(string(e.Payload), constants.SPLIT)
-        if len(parts) != 2 {
-          n.Printf("error parsing sensor hit request: %s (should be <sensor-name>:<hit-count>)", string(e.Payload))
+        sensorid, hitcount, err := common.ParseSensorHit(e.Payload)
+        if err != nil {
+          n.Printf("error parsing sensor hit request: %s (should be <sensor-name>:<hit-count>): %s", string(e.Payload), err)
           return
         }
 
-        sensorid := parts[0]
-        hitcount := parts[1]
-
-        if err := n.SendEventToSensor(sensorid, game.NewGameEvent(constants.SENSOR_HIT, []byte(hitcount))); err != nil {
+        if err := n.SendEventToSensor(sensorid, game.NewGameEvent(constants.SENSOR_HIT, []byte(fmt.Sprintf("%d", hitcount)))); err != nil {
           n.Printf("error sending event %s to sensor: %s", e.Name, err)
           return
         }

@@ -16,18 +16,26 @@ func ParseInt(s string) (int, error) {
   return strconv.Atoi(s)
 }
 
-func ParseTeamHit(payload []byte) (string, int, error) {
+func ParseHit(payload []byte) (string, int, error) {
   parts := ParsePayload(payload)
   if len(parts) < 2 {
-    return "", 0, errors.New(fmt.Sprintf("cannot parse team hit from %s - should be <team>:<count>", string(payload)))
+    return "", 0, errors.New(fmt.Sprintf("cannot parse hit from %s - should be <key>:<hit-count>", string(payload)))
   }
 
   hits, err := ParseInt(parts[1])
   if err != nil {
-    return "", 0, errors.New(fmt.Sprintf("cannot parse team hit from %s - %s", string(payload), err))
+    return "", 0, errors.New(fmt.Sprintf("cannot parse hit from %s - %s", string(payload), err))
   }
 
   return parts[0], hits, nil
+}
+
+func ParseSensorHit(payload []byte) (string, int, error) {
+  return ParseHit(payload)
+}
+
+func ParseTeamHit(payload []byte) (string, int, error) {
+  return ParseHit(payload)
 }
 
 func ParseNodeHitPayload(payload []byte) (string, string, int, error) {

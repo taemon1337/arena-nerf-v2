@@ -73,6 +73,10 @@ func (s *Sensor) Start(parentctx context.Context) error {
 }
 
 func (s *Sensor) SensorHit(sensorid string) {
+  if !s.IsTestSensor() {
+    s.led.Blink(5)
+  }
+
   pay := strings.Join([]string{sensorid, s.led.GetColor(), "1"}, constants.SPLIT)
   s.gamechan.GameChan <- game.NewGameEvent(constants.SENSOR_HIT, []byte(pay))
 }
