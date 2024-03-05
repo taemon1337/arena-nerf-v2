@@ -16,19 +16,19 @@ type SensorHitInput struct {
   color         string                  `yaml:"color" json:"color"`
   line          *gpiod.Line             `yaml:"-" json:"-"`
   hitchan       chan gpiod.LineEvent    `yaml:"-" json:"-"`
-  SensorChan    chan game.GameEvent     `yaml:"-" json:"-"`
+  HitChan       chan game.GameEvent     `yaml:"-" json:"-"`
   lasthit       time.Time               `yaml:"last_hit" json:"last_hit"`
   lock          *sync.Mutex             `yaml:"-" json:"-"`
   *log.Logger
 }
 
-func NewSensorHitInput(cfg *config.SensorConfig, sensorchan chan game.GameEvent, logger *log.Logger) *SensorHitInput {
+func NewSensorHitInput(cfg *config.SensorConfig, logger *log.Logger) *SensorHitInput {
   return &SensorHitInput{
     conf:           cfg,
     color:          "",
     line:           nil,
     hitchan:        make(chan gpiod.LineEvent, constants.CHANNEL_WIDTH),
-    SensorChan:     sensorchan,
+    HitChan:        make(chan game.GameEvent, constants.CHANNEL_WIDTH),
     lasthit:        time.Now(),
     lock:           &sync.Mutex{},
     Logger:   logger,
@@ -36,17 +36,21 @@ func NewSensorHitInput(cfg *config.SensorConfig, sensorchan chan game.GameEvent,
 }
 
 func (s *SensorHitInput) ProcessEvent(evt gpiod.LineEvent) {
-  s.lock.Lock()
-  defer s.lock.Unlock()
-
   debounce_duration := time.Duration(s.conf.Debounce) * time.Millisecond
 
   if time.Since(s.lasthit) < debounce_duration {
+    s.Printf("IGNORING DUP HIT: %s", evt)
     return // ignore since within debounce window
   }
 
+  s.Printf("HIT: %s", evt)
+
+  s.lock.Lock()
   s.lasthit = time.Now() // hittime is last debounced hit time
-  s.SensorChan <- game.NewGameEvent(constants.SENSOR_HIT, []byte("1"))
+  s.lock.Unlock()
+
+  s.HitChan <- game.NewGameEvent(constants.SENSOR_HIT, []byte("1"))
+  return
 }
 
 func (s *SensorHitInput) Start(ctx context.Context) error {
@@ -83,8 +87,10 @@ func (s *SensorHitInput) Start(ctx context.Context) error {
   for !done {
     select {
     case evt := <-s.hitchan:
-      s.Printf("HIT: %s", evt)
       s.ProcessEvent(evt)
+    case <-ctx.Done():
+      s.Printf("stopping hit input sensor")
+      return ctx.Err()
     }
   }
   return constants.ERR_SENSOR_HIT_STOPPED

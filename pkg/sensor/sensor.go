@@ -26,15 +26,14 @@ type Sensor struct {
 }
 
 func NewSensor(cfg *config.SensorConfig, gamechan *game.GameChannel, logger *log.Logger, enable_leds, enable_hits bool) *Sensor {
-  sensorchan := make(chan game.GameEvent, constants.CHANNEL_WIDTH)
   logger = log.New(logger.Writer(), fmt.Sprintf("[sensor:%s]: ", cfg.Id), logger.Flags())
 
   return &Sensor{
     conf:         cfg,
     gamechan:     gamechan,
-    SensorChan:   sensorchan,
+    SensorChan:   make(chan game.GameEvent, constants.CHANNEL_WIDTH),
     led:          NewSensorLed(cfg, logger),
-    hit:          NewSensorHitInput(cfg, sensorchan, logger),
+    hit:          NewSensorHitInput(cfg, logger),
     enableLeds:   enable_leds,
     enableHits:   enable_hits,
     Logger:       logger,
@@ -63,6 +62,10 @@ func (s *Sensor) Start(parentctx context.Context) error {
   g.Go(func() error {
     for {
       select {
+      case evt := <-s.hit.HitChan:
+        s.Printf("HIT CHAN: %s", evt)
+        s.SensorHit(s.conf.Id)
+        continue
       case evt := <-s.SensorChan:
         switch evt.Event {
           case constants.SENSOR_HIT:
