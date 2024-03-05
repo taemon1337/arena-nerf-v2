@@ -14,27 +14,29 @@ type SensorLed struct {
   color         string                  `yaml:"color" json:"color"`
   line          *gpiod.Line             `yaml:"-" json:"-"`
   lock          *sync.Mutex             `yaml:"-" json:"-"`
+  *log.Logger
 }
 
-func NewSensorLed(cfg *config.SensorConfig) *SensorLed {
+func NewSensorLed(cfg *config.SensorConfig, logger *log.Logger) *SensorLed {
   return &SensorLed{
     conf:     cfg,
     color:    "",
     line:     nil,
     lock:     &sync.Mutex{},
+    Logger:   logger,
   }
 }
 
 func (led *SensorLed) Connect() error {
   ledpin, err := ParseGpioPin(led.conf.Device, led.conf.Ledpin)
   if err != nil {
-    log.Printf("cannot parse gpio led pin %s: %s", ledpin, err)
+    led.Printf("cannot parse gpio led pin %s: %s", ledpin, err)
     return err
   }
 
   ledline, err := gpiod.RequestLine(led.conf.Gpiochip, ledpin, gpiod.AsOutput(constants.OFF))
   if err != nil {
-    log.Printf("cannot request gpiod %d led line: %s", ledpin, err)
+    led.Printf("cannot request gpiod %d led line: %s", ledpin, err)
     return err
   }
 

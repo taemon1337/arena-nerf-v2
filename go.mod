@@ -6,8 +6,9 @@ require (
 	github.com/google/uuid v1.6.0
 	github.com/hashicorp/serf v0.10.1
 	github.com/taemon1337/gpiod v0.0.0-20240220180906-08a014cf2579
+	gobot.io/x/gobot v1.16.0
 	golang.org/x/sync v0.6.0
-	gopkg.in/yaml.v2 v2.2.2
+	gopkg.in/yaml.v2 v2.2.8
 )
 
 require (
@@ -16,6 +17,7 @@ require (
 	github.com/armon/go-radix v1.0.0 // indirect
 	github.com/bgentry/speakeasy v0.1.0 // indirect
 	github.com/fatih/color v1.9.0 // indirect
+	github.com/gofrs/uuid v4.0.0+incompatible // indirect
 	github.com/google/btree v0.0.0-20180813153112-4030bb1f1f0c // indirect
 	github.com/hashicorp/errwrap v1.0.0 // indirect
 	github.com/hashicorp/go-immutable-radix v1.0.0 // indirect

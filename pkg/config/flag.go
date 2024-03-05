@@ -17,6 +17,8 @@ func (c *Config) Flags() error {
   flag.BoolVar(&c.EnableSimulation, "enable-simulation", c.EnableSimulation, "enables game simulation")
   flag.BoolVar(&c.EnableConnector, "enable-connector", c.EnableConnector, "enables clustering with other nodes")
   flag.BoolVar(&c.EnableTeamColors, "enable-team-colors", c.EnableTeamColors, "if set, all teams are also used as sensor led colors")
+  flag.BoolVar(&c.EnableLeds, "enable-leds", c.EnableLeds, "enable sensors with LEDs")
+  flag.BoolVar(&c.EnableHits, "enable-hits", c.EnableHits, "enable sensors with Hit vibration sensor inputs")
 
   flag.StringVar(&c.NodeName, "name", c.NodeName, "name of this node in the cluster")
   flag.StringVar(&c.AgentConf.BindAddr, "bind", c.AgentConf.BindAddr, "address to bind listeners to")

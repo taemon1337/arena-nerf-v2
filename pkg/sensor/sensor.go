@@ -20,18 +20,24 @@ type Sensor struct {
   SensorChan    chan game.GameEvent
   led           *SensorLed
   hit           *SensorHitInput
+  enableLeds    bool
+  enableHits    bool
   *log.Logger
 }
 
-func NewSensor(cfg *config.SensorConfig, gamechan *game.GameChannel, logger *log.Logger) *Sensor {
+func NewSensor(cfg *config.SensorConfig, gamechan *game.GameChannel, logger *log.Logger, enable_leds, enable_hits bool) *Sensor {
   sensorchan := make(chan game.GameEvent, constants.CHANNEL_WIDTH)
+  logger = log.New(logger.Writer(), fmt.Sprintf("[sensor:%s]: ", cfg.Id), logger.Flags())
+
   return &Sensor{
     conf:         cfg,
     gamechan:     gamechan,
     SensorChan:   sensorchan,
-    led:          NewSensorLed(cfg),
-    hit:          NewSensorHitInput(cfg, sensorchan),
-    Logger:       log.New(logger.Writer(), fmt.Sprintf("[sensor:%s]: ", cfg.Id), logger.Flags()),
+    led:          NewSensorLed(cfg, logger),
+    hit:          NewSensorHitInput(cfg, sensorchan, logger),
+    enableLeds:   enable_leds,
+    enableHits:   enable_hits,
+    Logger:       logger,
   }
 }
 
@@ -39,11 +45,19 @@ func (s *Sensor) Start(parentctx context.Context) error {
   s.Printf("starting sensor %s", s.conf.Id)
   g, ctx := errgroup.WithContext(parentctx)
 
-  if !s.IsTestSensor() {
+  if s.LedEnabled() {
     if err := s.led.Connect(); err != nil {
       s.Printf("error connecting to sensor: %s", err)
       return err
     }
+
+    defer s.led.Close()
+  }
+
+  if s.HitEnabled() {
+    g.Go(func() error {
+      return s.hit.Start(ctx)
+    })
   }
 
   g.Go(func() error {
@@ -85,6 +99,18 @@ func (s *Sensor) IsTestSensor() bool {
   return strings.HasPrefix(s.conf.Id, constants.TEST_SENSOR_PREFIX)
 }
 
+func (s *Sensor) LedEnabled() bool {
+  return s.conf.Ledpin != "" && s.enableLeds && !s.IsTestSensor()
+}
+
+func (s *Sensor) HitEnabled() bool {
+  return s.conf.Hitpin != "" && s.enableHits && !s.IsTestSensor()
+}
+
 func (s *Sensor) Led() *SensorLed {
   return s.led
+}
+
+func (s *Sensor) Hit() *SensorHitInput {
+  return s.hit
 }

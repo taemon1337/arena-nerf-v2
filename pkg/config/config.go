@@ -22,6 +22,8 @@ type Config struct {
   EnableSimulation        bool        `yaml:"enable_simulation" json:"enable_simulation"`
   EnableConnector         bool        `yaml:"enable_connector" json:"enable_connector"`
   EnableTeamColors        bool        `yaml:"enable_team_colors" json:"enable_team_colors"`
+  EnableLeds              bool        `yaml:"enable_leds" json:"enable_leds"`
+  EnableHits              bool        `yaml:"enable_hits" json:"enable_hits"`
   Teams                   []string    `yaml:"teams" json:"teams"`
   Nodes                   []string    `yaml:"nodes" json:"nodes"`
   Colors                  []string    `yaml:"colors" json:"colors"`
@@ -63,6 +65,8 @@ func NewConfig(logger *log.Logger) *Config {
     EnableSimulation:   false,
     EnableConnector:    false,
     EnableTeamColors:   false,
+    EnableLeds:         false,
+    EnableHits:         false,
     Teams:              []string{constants.BLUE_TEAM, constants.RED_TEAM, constants.YELLOW_TEAM, constants.GREEN_TEAM},
     Nodes:              []string{},
     Colors:             []string{},

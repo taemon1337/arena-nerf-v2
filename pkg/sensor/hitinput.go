@@ -4,6 +4,7 @@ import (
   "log"
   "sync"
   "time"
+  "context"
   "github.com/taemon1337/gpiod"
   "github.com/taemon1337/arena-nerf/pkg/constants"
   "github.com/taemon1337/arena-nerf/pkg/config"
@@ -18,9 +19,10 @@ type SensorHitInput struct {
   SensorChan    chan game.GameEvent     `yaml:"-" json:"-"`
   lasthit       time.Time               `yaml:"last_hit" json:"last_hit"`
   lock          *sync.Mutex             `yaml:"-" json:"-"`
+  *log.Logger
 }
 
-func NewSensorHitInput(cfg *config.SensorConfig, sensorchan chan game.GameEvent) *SensorHitInput {
+func NewSensorHitInput(cfg *config.SensorConfig, sensorchan chan game.GameEvent, logger *log.Logger) *SensorHitInput {
   return &SensorHitInput{
     conf:           cfg,
     color:          "",
@@ -29,6 +31,7 @@ func NewSensorHitInput(cfg *config.SensorConfig, sensorchan chan game.GameEvent)
     SensorChan:     sensorchan,
     lasthit:        time.Now(),
     lock:           &sync.Mutex{},
+    Logger:   logger,
   }
 }
 
@@ -46,26 +49,26 @@ func (s *SensorHitInput) ProcessEvent(evt gpiod.LineEvent) {
   s.SensorChan <- game.NewGameEvent(constants.SENSOR_HIT, []byte("1"))
 }
 
-func (s *SensorHitInput) Start() error {
+func (s *SensorHitInput) Start(ctx context.Context) error {
   hitpin, err := ParseGpioPin(s.conf.Device, s.conf.Hitpin)
   if err != nil {
     return err
   }
 
-  log.Printf("Sensor Hit input Hit pin: %d", hitpin)
+  s.Printf("Sensor Hit input Hit pin: %d", hitpin)
 
   // event channel buffer
   eh := func(evt gpiod.LineEvent) {
     select {
     case s.hitchan <- evt:
     default:
-      log.Printf("event chan overflow - discarding event")
+      s.Printf("event chan overflow - discarding event")
     }
   }
 
   hit, err := gpiod.RequestLine(s.conf.Gpiochip, hitpin, gpiod.WithPullUp, gpiod.WithRisingEdge, gpiod.WithEventHandler(eh))
   if err != nil {
-    log.Printf("cannot request gpiod %d hit line: %s", hitpin, err)
+    s.Printf("cannot request gpiod %d hit line: %s", hitpin, err)
     return err
   }
 
@@ -80,7 +83,7 @@ func (s *SensorHitInput) Start() error {
   for !done {
     select {
     case evt := <-s.hitchan:
-      log.Printf("HIT: %s", evt)
+      s.Printf("HIT: %s", evt)
       s.ProcessEvent(evt)
     }
   }
