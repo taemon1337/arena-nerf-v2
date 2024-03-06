@@ -6,6 +6,7 @@ import (
   "strings"
   "gopkg.in/yaml.v2"
   "github.com/taemon1337/arena-nerf/pkg/constants"
+  "github.com/taemon1337/arena-nerf/pkg/common"
 )
 
 type SensorConfig struct {
@@ -14,9 +15,7 @@ type SensorConfig struct {
   Gpiochip      string
   Hitpin        string
   Ledpin        string
-  Redpin        string
-  Greenpin      string
-  Bluepin       string
+  Ledcount      int
   Debounce      int
 }
 
@@ -24,30 +23,14 @@ type SensorsConfig struct {
   Configs       map[string]*SensorConfig    `yaml:"configs" json:"configs"`
 }
 
-func NewSensorConfig(id, device, chip, hitpin, ledrgbpin string, debouncetime int) *SensorConfig {
-  ledpin := ""
-  redpin := ""
-  greenpin := ""
-  bluepin := ""
-
-  parts := strings.Split(ledrgbpin, constants.SPLIT)
-  if len(parts) == 3 { // rgb led
-    redpin = parts[0]
-    greenpin = parts[1]
-    bluepin = parts[2]
-  } else {
-    ledpin = ledrgbpin // assumes single led pin
-  }
-
+func NewSensorConfig(id, device, chip, hitpin, ledpin string, ledcount, debouncetime int) *SensorConfig {
   return &SensorConfig{
     Id:           id,
     Device:       device,
     Gpiochip:     chip,
     Hitpin:       hitpin,
     Ledpin:       ledpin,
-    Redpin:       redpin,
-    Greenpin:     greenpin,
-    Bluepin:      bluepin,
+    Ledcount:     ledcount,
     Debounce:     debouncetime,
   }
 }
@@ -59,9 +42,7 @@ func DefaultSensorConfig(id string) *SensorConfig {
     Gpiochip:     "gpiochip0",
     Hitpin:       "",
     Ledpin:       "",
-    Redpin:       "",
-    Greenpin:     "",
-    Bluepin:      "",
+    Ledcount:     0,
     Debounce:     100,
   }
 }
@@ -70,10 +51,6 @@ func NewSensorsConfig() *SensorsConfig {
   return &SensorsConfig{
     Configs:    map[string]*SensorConfig{},
   }
-}
-
-func (sc *SensorConfig) IsRGB() bool {
-  return sc.Redpin != "" && sc.Greenpin != "" && sc.Bluepin != ""
 }
 
 func (sc *SensorConfig) Enabled() bool {
@@ -109,16 +86,28 @@ func (sc *SensorsConfig) Set(value string) error {
     return nil
   }
 
-  if len(parts) != 5 {
+  if len(parts) < 5 {
     return constants.ERR_INVALID_SENSOR_FLAG
   }
 
   dev := parts[1]
   chip := parts[2]
   hit := parts[3]
-  led := parts[4] // either a single pin or 3 rgb pins, i.e. 'gpio13' or 'gpio13:gpio14:gpio17' for rgb led
+  led := parts[4]
+  ledcount := 1
 
-  sc.Configs[id] = NewSensorConfig(id, dev, chip, hit, led, 100)
+  if len(parts) > 5 {
+    count, err := common.ParseInt(parts[5])
+    if err != nil {
+      return err
+    }
+    if count < 2 {
+      return constants.ERR_INVALID_LED_COUNT
+    }
+    ledcount = count // number of leds (default is 1), > 1 means use LED strip
+  }
+
+  sc.Configs[id] = NewSensorConfig(id, dev, chip, hit, led, ledcount, 100)
   return nil
 }
 

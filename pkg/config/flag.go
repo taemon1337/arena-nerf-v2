@@ -34,7 +34,7 @@ func (c *Config) Flags() error {
   flag.StringVar(&c.Logdir, "logdir", c.Logdir, "The directory to store game logs (which are served from the UI)")
 
   // -sensor 1:orangepi:gpiochip0:73:3
-  flag.Var(c.SensorsConf, "sensor", "Add a sensor in the form of -sensor one:orangepi:gpiochip0:73:13, <1-4>:<device>:<gpiochip>:<hitpin>:<ledpin>")
+  flag.Var(c.SensorsConf, "sensor", "Add a sensor in the form of -sensor one:orangepi:gpiochip0:73:13, <1-4>:<device>:<gpiochip>:<hitpin>:<ledpin:?5vpin>")
 
   flag.Parse()
 

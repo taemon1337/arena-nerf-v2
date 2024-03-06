@@ -19,6 +19,7 @@ type Sensor struct {
   gamechan      *game.GameChannel
   SensorChan    chan game.GameEvent
   led           *SensorLed
+  ledstrip      *LedStrip
   hit           *SensorHitInput
   enableLeds    bool
   enableHits    bool
@@ -33,6 +34,7 @@ func NewSensor(cfg *config.SensorConfig, gamechan *game.GameChannel, logger *log
     gamechan:     gamechan,
     SensorChan:   make(chan game.GameEvent, constants.CHANNEL_WIDTH),
     led:          NewSensorLed(cfg, logger),
+    ledstrip:     NewLedStrip(cfg, logger),
     hit:          NewSensorHitInput(cfg, logger),
     enableLeds:   enable_leds,
     enableHits:   enable_hits,
@@ -45,12 +47,20 @@ func (s *Sensor) Start(parentctx context.Context) error {
   g, ctx := errgroup.WithContext(parentctx)
 
   if s.LedEnabled() {
-    if err := s.led.Connect(); err != nil {
-      s.Printf("error connecting to sensor: %s", err)
-      return err
+    if s.LedStripEnabled() {
+      if err := s.ledstrip.Connect(); err != nil {
+        s.Printf("error connecting to LED strip on sensor %s: %s", s.conf.Id, err)
+      }
     }
 
-    defer s.led.Close()
+    if s.LedSingleEnabled() {
+      if err := s.led.Connect(); err != nil {
+        s.Printf("error connecting to LED on sensor %s: %s", s.conf.Id, err)
+        return err
+      }
+
+      defer s.led.Close()
+    }
   }
 
   if s.HitEnabled() {
@@ -104,6 +114,14 @@ func (s *Sensor) IsTestSensor() bool {
 
 func (s *Sensor) LedEnabled() bool {
   return s.conf.Ledpin != "" && s.enableLeds && !s.IsTestSensor()
+}
+
+func (s *Sensor) LedStripEnabled() bool {
+  return s.conf.Ledpin != "" && s.conf.Ledcount > 1
+}
+
+func (s *Sensor) LedSingleEnabled() bool {
+  return s.conf.Ledpin != "" && s.conf.Ledcount == 1
 }
 
 func (s *Sensor) HitEnabled() bool {
