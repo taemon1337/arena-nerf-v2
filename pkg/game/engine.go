@@ -368,8 +368,12 @@ func (ge *GameEngine) GetScoreboard() (map[string]int, map[string]int, error) {
 
 
 func (ge *GameEngine) SendEventToGame(e GameEvent) error {
-  ge.gamechan.GameChan <- e
-  ge.CurrentGameState.LogGameEvent(e)
+  select {
+    case ge.gamechan.GameChan <- e:
+      ge.CurrentGameState.LogGameEvent(e)
+    default:
+      ge.Printf("game chan is full - discarding event: %s", e)
+  }
   return nil
 }
 

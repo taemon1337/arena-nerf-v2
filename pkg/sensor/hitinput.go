@@ -49,8 +49,11 @@ func (s *SensorHitInput) ProcessEvent(evt gpiod.LineEvent) {
   s.lasthit = time.Now() // hittime is last debounced hit time
   s.lock.Unlock()
 
-  s.HitChan <- game.NewGameEvent(constants.SENSOR_HIT, []byte("1"))
-  return
+  select {
+    case s.HitChan <- game.NewGameEvent(constants.SENSOR_HIT, []byte("1")):
+    default:
+      s.Printf("hit channel is full - discarding event: %s", evt)
+  }
 }
 
 func (s *SensorHitInput) Start(ctx context.Context) error {

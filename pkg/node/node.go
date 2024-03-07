@@ -249,7 +249,11 @@ func (n *Node) SendEventToSensor(sensorid string, e game.GameEvent) error {
     return constants.ERR_NO_SENSOR_BY_NAME
   }
 
-  n.sensors[sensorid].SensorChan <- e
+  select {
+    case n.sensors[sensorid].SensorChan <- e:
+    default:
+      n.Printf("sensor chan is full - discarding event: %s", e)
+  }
   return nil
 }
 

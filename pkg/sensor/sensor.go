@@ -105,7 +105,11 @@ func (s *Sensor) SensorHit(sensorid string) {
   }
 
   pay := strings.Join([]string{sensorid, s.led.GetColor(), "1"}, constants.SPLIT)
-  s.gamechan.GameChan <- game.NewGameEvent(constants.SENSOR_HIT, []byte(pay))
+  select {
+    case s.gamechan.GameChan <- game.NewGameEvent(constants.SENSOR_HIT, []byte(pay)):
+    default:
+      s.Printf("game chan is full - discarding event sensor hit")
+  }
 }
 
 func (s *Sensor) IsTestSensor() bool {
