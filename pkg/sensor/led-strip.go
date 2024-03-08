@@ -24,10 +24,16 @@ type LedStrip struct {
 
 // NewLedStrip initializes a new LedStrip instance
 func NewLedStrip(cfg *config.SensorConfig, logger *log.Logger) *LedStrip {
+  numleds := cfg.Ledcount
+  ledstrip := make([]RGB, numleds)
+  for i := range ledstrip {
+    ledstrip[i] = RGB{0, 0, 0} // black|off
+  }
+
   return &LedStrip{
     conf:       cfg,
-    numLEDs:    cfg.Ledcount,
-    ledStrip:   make([]RGB, cfg.Ledcount),
+    numLEDs:    numleds,
+    ledStrip:   ledstrip,
     datapin:    cfg.Ledpin,
     dataline:   nil,
     Logger:     logger,
@@ -83,67 +89,70 @@ func (strip *LedStrip) BlinkOnce(color RGB) error {
     if err := strip.Off(); err != nil {
       return err
     }
+  } else {
+    strip.Printf("strip not connected")
   }
   return nil
 }
 
 // SetLEDColor sets the color of an individual LED by its index
 func (strip *LedStrip) SetLEDColor(index int, color RGB) {
-    if index >= 0 && index < strip.numLEDs {
-        strip.ledStrip[index] = color
-    }
+  if index >= 0 && index < strip.numLEDs {
+    strip.ledStrip[index] = color
+  }
 }
 
 // On turns all LEDs to the same given color
 func (strip *LedStrip) On(color RGB) error {
-    for i := range strip.ledStrip {
-        strip.SetLEDColor(i, color)
-    }
-    return strip.SendData()
+  for i := range strip.ledStrip {
+    strip.SetLEDColor(i, color)
+  }
+  return strip.SendData()
 }
 
 // Off turns off all LEDs by setting their colors to black
 func (strip *LedStrip) Off() error {
-    black := RGB{0, 0, 0}
-    return strip.On(black)
+  black := RGB{0, 0, 0}
+  return strip.On(black)
 }
 
 // SendData sends data to NeoPixels
 func (strip *LedStrip) SendData() error {
-    // Send data to NeoPixels bit by bit
-    for _, rgb := range strip.ledStrip {
-        // Send RGB data
-        strip.sendRGBData(rgb.R, rgb.G, rgb.B)
-    }
+  strip.Printf("rendering leds")
+  // Send data to NeoPixels bit by bit
+  for _, rgb := range strip.ledStrip {
+      // Send RGB data
+      strip.sendRGBData(rgb.R, rgb.G, rgb.B)
+  }
 
-    return nil
+  return nil
 }
 
 // SendRGBData sends RGB data to NeoPixels
 func (strip *LedStrip) sendRGBData(red, green, blue uint8) {
-    for i := 7; i >= 0; i-- {
-        strip.sendDataBit((green >> uint(i)) & 0x01)
-    }
-    for i := 7; i >= 0; i-- {
-        strip.sendDataBit((red >> uint(i)) & 0x01)
-    }
-    for i := 7; i >= 0; i-- {
-        strip.sendDataBit((blue >> uint(i)) & 0x01)
-    }
+  for i := 7; i >= 0; i-- {
+    strip.sendDataBit((green >> uint(i)) & 0x01)
+  }
+  for i := 7; i >= 0; i-- {
+    strip.sendDataBit((red >> uint(i)) & 0x01)
+  }
+  for i := 7; i >= 0; i-- {
+    strip.sendDataBit((blue >> uint(i)) & 0x01)
+  }
 }
 
 // SendDataBit sends a single bit of data to NeoPixels
 func (strip *LedStrip) sendDataBit(bit uint8) {
-    if bit == 1 {
-        if err := strip.dataline.SetValue(1); err != nil {
-            // Handle error
-            return
-        }
-    } else {
-        if err := strip.dataline.SetValue(0); err != nil {
-            // Handle error
-            return
-        }
+  if bit == 1 {
+    if err := strip.dataline.SetValue(1); err != nil {
+      // Handle error
+      return
     }
+  } else {
+    if err := strip.dataline.SetValue(0); err != nil {
+      // Handle error
+      return
+    }
+  }
 }
 

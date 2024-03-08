@@ -77,7 +77,7 @@ func (sc *SensorConfig) Error() error {
 }
 
 func (sc *SensorsConfig) Set(value string) error {
-  parts := strings.SplitN(value, constants.SPLIT, 5) // split at most into 5 parts
+  parts := strings.SplitN(value, constants.SPLIT, 6) // split at most into 6 parts, id:dev:chip:hit:led:ledcount
   id := parts[0]
   log.Printf("parsing sensor %s", value)
 
