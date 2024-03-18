@@ -5,6 +5,7 @@ import (
   "sync"
   "time"
   "context"
+  "golang.org/x/sync/errgroup"
   "github.com/taemon1337/gpiod"
   "github.com/taemon1337/arena-nerf/pkg/constants"
   "github.com/taemon1337/arena-nerf/pkg/config"
@@ -56,7 +57,7 @@ func (s *SensorHitInput) ProcessEvent(evt gpiod.LineEvent) {
   }
 }
 
-func (s *SensorHitInput) Start(ctx context.Context) error {
+func (s *SensorHitInput) Start(parentctx context.Context) error {
   hitpin, err := ParseGpioPin(s.conf.Device, s.conf.Hitpin)
   if err != nil {
     return err
@@ -81,20 +82,24 @@ func (s *SensorHitInput) Start(ctx context.Context) error {
 
   s.line = hit
 
-  defer func() {
-    hit.Reconfigure(gpiod.AsInput)
-    hit.Close()
-  }()
+  g, ctx := errgroup.WithContext(parentctx)
 
-  done := false
-  for !done {
-    select {
-    case evt := <-s.hitchan:
-      s.ProcessEvent(evt)
-    case <-ctx.Done():
-      s.Printf("stopping hit input sensor")
-      return ctx.Err()
+  g.Go(func() error {
+    defer func() {
+      hit.Reconfigure(gpiod.AsInput)
+      hit.Close()
+    }()
+
+    for {
+      select {
+      case evt := <-s.hitchan:
+        s.ProcessEvent(evt)
+      case <-ctx.Done():
+        s.Printf("stopping hit input sensor")
+        return ctx.Err()
+      }
     }
-  }
-  return constants.ERR_SENSOR_HIT_STOPPED
+  })
+
+  return g.Wait()
 }

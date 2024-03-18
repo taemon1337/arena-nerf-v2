@@ -70,8 +70,6 @@ func (ctrl *Controller) Start(ctx context.Context) error {
         ctrl.Printf("stopping controller")
         ctrl.conn.Shutdown()
         return ctx.Err()
-      default:
-        time.Sleep(3 * time.Second) // do something later
       }
     }
   })

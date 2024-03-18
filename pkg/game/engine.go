@@ -173,8 +173,6 @@ func (ge *GameEngine) Start(ctx context.Context) error {
     case <-ctx.Done():
       ge.Printf("stopping game engine")
       return ctx.Err()
-    default:
-      time.Sleep(3 * time.Second) // do something later
     }
   }
 }

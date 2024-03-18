@@ -3,7 +3,6 @@ package sensor
 import (
   "fmt"
   "log"
-  "time"
   "strings"
   "context"
   "golang.org/x/sync/errgroup"
@@ -15,6 +14,7 @@ import (
 // https://github.com/hybridgroup/gobot/blob/release/drivers/gpio/rgb_led_driver.go
 
 type Sensor struct {
+  id            string
   conf          *config.SensorConfig
   gamechan      *game.GameChannel
   SensorChan    chan game.GameEvent
@@ -26,10 +26,12 @@ type Sensor struct {
   *log.Logger
 }
 
-func NewSensor(cfg *config.SensorConfig, gamechan *game.GameChannel, logger *log.Logger, enable_leds, enable_hits bool) *Sensor {
-  logger = log.New(logger.Writer(), fmt.Sprintf("[sensor:%s]: ", cfg.Id), logger.Flags())
+func NewSensor(id string, cfg *config.SensorConfig, gamechan *game.GameChannel, logger *log.Logger, enable_leds, enable_hits bool) *Sensor {
+  logger.Printf("creating sensor %s", id)
+  logger = log.New(logger.Writer(), fmt.Sprintf("[sensor:%s]: ", id), logger.Flags())
 
   return &Sensor{
+    id:           id,
     conf:         cfg,
     gamechan:     gamechan,
     SensorChan:   make(chan game.GameEvent, constants.CHANNEL_WIDTH),
@@ -50,6 +52,7 @@ func (s *Sensor) Start(parentctx context.Context) error {
     if s.LedStripEnabled() {
       if err := s.ledstrip.Connect(); err != nil {
         s.Printf("error connecting to LED strip on sensor %s: %s", s.conf.Id, err)
+        return err
       }
     }
 
@@ -58,8 +61,6 @@ func (s *Sensor) Start(parentctx context.Context) error {
         s.Printf("error connecting to LED on sensor %s: %s", s.conf.Id, err)
         return err
       }
-
-      defer s.led.Close()
     }
   }
 
@@ -89,9 +90,8 @@ func (s *Sensor) Start(parentctx context.Context) error {
         }
       case <-ctx.Done():
         s.Printf("stopping sensor %s", s.conf.Id)
+        s.Close()
         return ctx.Err()
-      default:
-        time.Sleep(3 * time.Second) // do something later
       }
     }
   })

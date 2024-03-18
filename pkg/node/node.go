@@ -4,6 +4,7 @@ import (
   "log"
   "fmt"
   "time"
+  "sync"
   "strings"
   "context"
   "math/rand"
@@ -26,6 +27,7 @@ type Node struct {
   sensors       map[string]*sensor.Sensor
   gamechan      *game.GameChannel
   nodestate     *NodeState
+  nodelock      *sync.Mutex
   *log.Logger
 }
 
@@ -38,6 +40,7 @@ func NewNode(cfg *config.Config, gamechan *game.GameChannel, logger *log.Logger)
     gamechan:   gamechan,
     sensors:    map[string]*sensor.Sensor{},
     nodestate:  NewNodeState(cfg.AgentConf.NodeName),
+    nodelock:   &sync.Mutex{},
     Logger:     logger,
   }
 }
@@ -62,19 +65,31 @@ func (n *Node) Start(ctx context.Context) error {
 
   if n.conf.EnableSensors {
     for id, cfg := range n.conf.SensorsConf.Configs {
+      n.nodelock.Lock()
+      n.Printf("initializing sensor %s", id)
       err := cfg.Error()
       if err != nil && err != constants.ERR_TEST_SENSOR {
         return err
       }
 
-      n.sensors[id] = sensor.NewSensor(cfg, n.gamechan, n.Logger, n.conf.EnableLeds, n.conf.EnableHits)
-
-      g.Go(func() error {
-        return n.sensors[id].Start(ctx)
-      })
+      n.sensors[id] = sensor.NewSensor(id, cfg, n.gamechan, n.Logger, n.conf.EnableLeds, n.conf.EnableHits)
+      n.Printf("initialized sensor %s", id)
+      n.nodelock.Unlock()
     }
   } else {
     n.Printf("sensors disabled")
+  }
+
+  n.Printf("SENSORS: %s", n.sensors)
+
+  for id, sens := range n.sensors {
+    // sensorId := id // local variable needed to store id inside loop (otherwise it will call the same sensor 2x)
+    n.nodelock.Lock()
+    g.Go(func() error {
+      return sens.Start(ctx)
+    })
+    n.nodelock.Unlock()
+    n.Printf("started sensor %s", id)
   }
 
   g.Go(func() error {
@@ -96,14 +111,19 @@ func (n *Node) Start(ctx context.Context) error {
         }
       case <-ctx.Done():
         n.Printf("stopping node")
+        n.Close()
         return ctx.Err()
-      default:
-        time.Sleep(3 * time.Second) // do something later
       }
     }
   })
 
   return g.Wait()
+}
+
+func (n *Node) Close() {
+  for _, s := range n.sensors {
+    s.Close()
+  }
 }
 
 // handle event are events from serf (over the network)
