@@ -55,6 +55,10 @@ func (led *SensorLed) Close() {
   led.line.Close()
 }
 
+func (led *SensorLed) Connected() bool {
+  return led.line != nil
+}
+
 func (led *SensorLed) SetColor(color string) {
   led.lock.Lock()
   defer led.lock.Unlock()

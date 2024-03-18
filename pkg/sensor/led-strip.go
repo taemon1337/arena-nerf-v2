@@ -3,7 +3,7 @@ package sensor
 import (
   "log"
   "time"
-  "github.com/taemon1337/gpiod"
+  "github.com/rpi-ws281x/rpi-ws281x-go"
   "github.com/taemon1337/arena-nerf/pkg/config"
   "github.com/taemon1337/arena-nerf/pkg/constants"
 )
@@ -12,30 +12,26 @@ type RGB struct {
 	R, G, B uint8
 }
 
+func (c RGB) Value() uint32 {
+  return uint32(c.R)<<16 | uint32(c.G)<<8 | uint32(c.B)
+}
+
 // LedStrip represents an LED strip with RGB colors and GPIO lines for communication
 type LedStrip struct {
   conf          *config.SensorConfig
   numLEDs       int
-  ledStrip      []RGB
+  ledstrip      *ws2811.WS2811
   datapin       string
-  dataline      *gpiod.Line
   *log.Logger
 }
 
 // NewLedStrip initializes a new LedStrip instance
 func NewLedStrip(cfg *config.SensorConfig, logger *log.Logger) *LedStrip {
-  numleds := cfg.Ledcount
-  ledstrip := make([]RGB, numleds)
-  for i := range ledstrip {
-    ledstrip[i] = RGB{0, 0, 0} // black|off
-  }
-
   return &LedStrip{
     conf:       cfg,
-    numLEDs:    numleds,
-    ledStrip:   ledstrip,
+    numLEDs:    cfg.Ledcount,
+    ledstrip:   nil,
     datapin:    cfg.Ledpin,
-    dataline:   nil,
     Logger:     logger,
   }
 }
@@ -47,13 +43,30 @@ func (strip *LedStrip) Connect() error {
     return err
   }
 
-  dataline, err := gpiod.RequestLine(strip.conf.Gpiochip, datapin, gpiod.AsOutput(constants.OFF))
+  strip.Printf("gpio LED pin: %d", datapin)
+
+  width := 1
+  height := strip.numLEDs
+  bright := 64 // 0-255
+  size := width * height
+  opt := ws2811.DefaultOptions
+  opt.Channels[0].Brightness = bright
+  opt.Channels[0].LedCount = size
+  opt.Channels[0].GpioPin = datapin
+
+  ws, err := ws2811.MakeWS2811(&opt)
   if err != nil {
-    log.Printf("cannot request gpiod %d led data line: %s", datapin, err)
+    strip.Printf("could not get new LED device: %s", err)
     return err
   }
 
-  strip.dataline = dataline
+  err = ws.Init()
+  if err != nil {
+    strip.Printf("could not initialize LED strip: %s", err)
+    return err
+  }
+
+  strip.ledstrip = ws
 
   // start by blinking led
   log.Printf("Blinking LED strip 5 times...")
@@ -66,7 +79,11 @@ func (strip *LedStrip) Connect() error {
 }
 
 func (strip *LedStrip) Connected() bool {
-  return strip.dataline != nil
+  return strip.ledstrip != nil
+}
+
+func (strip *LedStrip) Close() {
+  strip.ledstrip.Fini()
 }
 
 // On turns all LEDs to the same given color
@@ -97,17 +114,17 @@ func (strip *LedStrip) BlinkOnce(color RGB) error {
 
 // SetLEDColor sets the color of an individual LED by its index
 func (strip *LedStrip) SetLEDColor(index int, color RGB) {
-  if index >= 0 && index < strip.numLEDs {
-    strip.ledStrip[index] = color
+  for i := 0; i < len(strip.ledstrip.Leds(0)); i++ {
+    strip.ledstrip.Leds(0)[i] = color.Value()
   }
 }
 
 // On turns all LEDs to the same given color
 func (strip *LedStrip) On(color RGB) error {
-  for i := range strip.ledStrip {
+  for i := 0; i < strip.numLEDs; i++ {
     strip.SetLEDColor(i, color)
   }
-  return strip.SendData()
+  return strip.ledstrip.Render()
 }
 
 // Off turns off all LEDs by setting their colors to black
@@ -115,44 +132,3 @@ func (strip *LedStrip) Off() error {
   black := RGB{0, 0, 0}
   return strip.On(black)
 }
-
-// SendData sends data to NeoPixels
-func (strip *LedStrip) SendData() error {
-  strip.Printf("rendering leds")
-  // Send data to NeoPixels bit by bit
-  for _, rgb := range strip.ledStrip {
-      // Send RGB data
-      strip.sendRGBData(rgb.R, rgb.G, rgb.B)
-  }
-
-  return nil
-}
-
-// SendRGBData sends RGB data to NeoPixels
-func (strip *LedStrip) sendRGBData(red, green, blue uint8) {
-  for i := 7; i >= 0; i-- {
-    strip.sendDataBit((green >> uint(i)) & 0x01)
-  }
-  for i := 7; i >= 0; i-- {
-    strip.sendDataBit((red >> uint(i)) & 0x01)
-  }
-  for i := 7; i >= 0; i-- {
-    strip.sendDataBit((blue >> uint(i)) & 0x01)
-  }
-}
-
-// SendDataBit sends a single bit of data to NeoPixels
-func (strip *LedStrip) sendDataBit(bit uint8) {
-  if bit == 1 {
-    if err := strip.dataline.SetValue(1); err != nil {
-      // Handle error
-      return
-    }
-  } else {
-    if err := strip.dataline.SetValue(0); err != nil {
-      // Handle error
-      return
-    }
-  }
-}
-

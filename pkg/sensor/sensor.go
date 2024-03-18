@@ -99,6 +99,15 @@ func (s *Sensor) Start(parentctx context.Context) error {
   return g.Wait()
 }
 
+func (s *Sensor) Close() {
+  if s.led.Connected() {
+    s.led.Close()
+  }
+  if s.ledstrip.Connected() {
+    s.ledstrip.Close()
+  }
+}
+
 func (s *Sensor) SensorHit(sensorid string) {
   if !s.IsTestSensor() {
     s.led.Blink(5)

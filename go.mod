@@ -5,8 +5,8 @@ go 1.21.5
 require (
 	github.com/google/uuid v1.6.0
 	github.com/hashicorp/serf v0.10.1
+	github.com/rpi-ws281x/rpi-ws281x-go v1.0.10
 	github.com/taemon1337/gpiod v0.0.0-20240220180906-08a014cf2579
-	gobot.io/x/gobot v1.16.0
 	golang.org/x/sync v0.6.0
 	gopkg.in/yaml.v2 v2.2.8
 )
@@ -17,7 +17,6 @@ require (
 	github.com/armon/go-radix v1.0.0 // indirect
 	github.com/bgentry/speakeasy v0.1.0 // indirect
 	github.com/fatih/color v1.9.0 // indirect
-	github.com/gofrs/uuid v4.0.0+incompatible // indirect
 	github.com/google/btree v0.0.0-20180813153112-4030bb1f1f0c // indirect
 	github.com/hashicorp/errwrap v1.0.0 // indirect
 	github.com/hashicorp/go-immutable-radix v1.0.0 // indirect
@@ -34,8 +33,11 @@ require (
 	github.com/miekg/dns v1.1.41 // indirect
 	github.com/mitchellh/cli v1.1.0 // indirect
 	github.com/mitchellh/mapstructure v0.0.0-20160808181253-ca63d7c062ee // indirect
+	github.com/niemeyer/pretty v0.0.0-20200227124842-a10e7caefd8e // indirect
+	github.com/pkg/errors v0.9.1 // indirect
 	github.com/posener/complete v1.2.3 // indirect
 	github.com/sean-/seed v0.0.0-20170313163322-e2103e2c3529 // indirect
 	golang.org/x/net v0.0.0-20210410081132-afb366fc7cd1 // indirect
 	golang.org/x/sys v0.10.0 // indirect
+	gopkg.in/check.v1 v1.0.0-20200227125254-8fa46927fb4f // indirect
 )

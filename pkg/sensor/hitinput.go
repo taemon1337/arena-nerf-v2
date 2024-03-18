@@ -62,7 +62,7 @@ func (s *SensorHitInput) Start(ctx context.Context) error {
     return err
   }
 
-  s.Printf("Sensor Hit input Hit pin: %d", hitpin)
+  s.Printf("gpio hit pin: %d", hitpin)
 
   // event channel buffer
   eh := func(evt gpiod.LineEvent) {
@@ -98,4 +98,3 @@ func (s *SensorHitInput) Start(ctx context.Context) error {
   }
   return constants.ERR_SENSOR_HIT_STOPPED
 }
-
