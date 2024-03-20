@@ -27,7 +27,6 @@ type Sensor struct {
 }
 
 func NewSensor(id string, cfg *config.SensorConfig, gamechan *game.GameChannel, logger *log.Logger, enable_leds, enable_hits bool) *Sensor {
-  logger.Printf("creating sensor %s", id)
   logger = log.New(logger.Writer(), fmt.Sprintf("[sensor:%s]: ", id), logger.Flags())
 
   return &Sensor{
@@ -45,20 +44,20 @@ func NewSensor(id string, cfg *config.SensorConfig, gamechan *game.GameChannel, 
 }
 
 func (s *Sensor) Start(parentctx context.Context) error {
-  s.Printf("starting sensor %s", s.conf.Id)
+  s.Printf("starting sensor %s", s.id)
   g, ctx := errgroup.WithContext(parentctx)
 
   if s.LedEnabled() {
     if s.LedStripEnabled() {
       if err := s.ledstrip.Connect(); err != nil {
-        s.Printf("error connecting to LED strip on sensor %s: %s", s.conf.Id, err)
+        s.Printf("error connecting to LED strip on sensor %s: %s", s.id, err)
         return err
       }
     }
 
     if s.LedSingleEnabled() {
       if err := s.led.Connect(); err != nil {
-        s.Printf("error connecting to LED on sensor %s: %s", s.conf.Id, err)
+        s.Printf("error connecting to LED on sensor %s: %s", s.id, err)
         return err
       }
     }
@@ -75,13 +74,13 @@ func (s *Sensor) Start(parentctx context.Context) error {
       select {
       case evt := <-s.hit.HitChan:
         s.Printf("HIT CHAN: %s", evt)
-        s.SensorHit(s.conf.Id)
+        s.SensorHit(s.id)
         continue
       case evt := <-s.SensorChan:
         switch evt.Event {
           case constants.SENSOR_HIT:
             s.Printf("sensor received sensor hit game event: %s", evt)
-            s.SensorHit(s.conf.Id)
+            s.SensorHit(s.id)
           case constants.SENSOR_COLOR:
             s.Printf("sensor received sensor color game event: %s", evt)
             s.led.SetColor(string(evt.Payload))
@@ -89,14 +88,19 @@ func (s *Sensor) Start(parentctx context.Context) error {
             s.Printf("unrecognized sensor event: %s", evt)
         }
       case <-ctx.Done():
-        s.Printf("stopping sensor %s", s.conf.Id)
+        s.Printf("stopping sensor %s", s.id)
         s.Close()
         return ctx.Err()
       }
     }
   })
 
-  return g.Wait()
+  err := g.Wait()
+  if err != nil {
+    s.Printf("sensor watch ended with error: %s", err)
+  }
+
+  return err
 }
 
 func (s *Sensor) Close() {
@@ -110,19 +114,20 @@ func (s *Sensor) Close() {
 
 func (s *Sensor) SensorHit(sensorid string) {
   if !s.IsTestSensor() {
-    s.led.Blink(5)
+    s.led.Blink(1)
   }
 
   pay := strings.Join([]string{sensorid, s.led.GetColor(), "1"}, constants.SPLIT)
   select {
     case s.gamechan.GameChan <- game.NewGameEvent(constants.SENSOR_HIT, []byte(pay)):
+      s.Printf("successfully sent sensor hit event: %s", pay)
     default:
       s.Printf("game chan is full - discarding event sensor hit")
   }
 }
 
 func (s *Sensor) IsTestSensor() bool {
-  return strings.HasPrefix(s.conf.Id, constants.TEST_SENSOR_PREFIX)
+  return strings.HasPrefix(s.id, constants.TEST_SENSOR_PREFIX)
 }
 
 func (s *Sensor) LedEnabled() bool {

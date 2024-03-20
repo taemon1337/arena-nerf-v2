@@ -73,22 +73,17 @@ func (n *Node) Start(ctx context.Context) error {
       }
 
       n.sensors[id] = sensor.NewSensor(id, cfg, n.gamechan, n.Logger, n.conf.EnableLeds, n.conf.EnableHits)
-      n.Printf("initialized sensor %s", id)
       n.nodelock.Unlock()
     }
   } else {
     n.Printf("sensors disabled")
   }
 
-  n.Printf("SENSORS: %s", n.sensors)
-
-  for id, sens := range n.sensors {
-    // sensorId := id // local variable needed to store id inside loop (otherwise it will call the same sensor 2x)
-    n.nodelock.Lock()
+  for id, _ := range n.sensors {
+    sens := n.GetSensorById(id) // local variable needed to store id inside loop (otherwise it will call the same sensor 2x)
     g.Go(func() error {
       return sens.Start(ctx)
     })
-    n.nodelock.Unlock()
     n.Printf("started sensor %s", id)
   }
 
@@ -106,6 +101,8 @@ func (n *Node) Start(ctx context.Context) error {
 
             n.Printf("node received sensor hit: %s", e)
             n.nodestate.AddNodeHit(sensorid, sensorcolor, hitcount)
+            n.Printf("node recorded sensor hit: %s", e)
+            continue
           default:
             n.Printf("node received game event: %s", e)
         }
@@ -117,12 +114,24 @@ func (n *Node) Start(ctx context.Context) error {
     }
   })
 
-  return g.Wait()
+  err := g.Wait()
+  if err != nil {
+    n.Printf("node watch ended with error: %s", err)
+  }
+  return err
+}
+
+func (n *Node) GetSensorById(id string) *sensor.Sensor {
+  if _, ok := n.sensors[id]; !ok {
+    return nil
+  }
+  return n.sensors[id]
 }
 
 func (n *Node) Close() {
-  for _, s := range n.sensors {
-    s.Close()
+  for id, _ := range n.sensors {
+    sens := n.GetSensorById(id)
+    sens.Close()
   }
 }
 
@@ -183,13 +192,13 @@ func (n *Node) HandleEvent(evt serf.Event) {
         }
 
         if color == constants.RANDOM_COLOR_ID {
-          if _, ok := n.sensors[sensorid]; !ok {
+          sens := n.GetSensorById(sensorid)
+          if sens == nil {
             n.Printf("no sensor found named %s on this node", sensorid)
-            return
+            return 
           }
 
-          sensor := n.sensors[sensorid]
-          led := sensor.Led()
+          led := sens.Led()
           if led != nil {
             currentcolor := led.GetColor()
             color = n.RandomColor(currentcolor)
@@ -271,6 +280,7 @@ func (n *Node) SendEventToSensor(sensorid string, e game.GameEvent) error {
 
   select {
     case n.sensors[sensorid].SensorChan <- e:
+      n.Printf("sent event to sensor: %s", e)
     default:
       n.Printf("sensor chan is full - discarding event: %s", e)
   }

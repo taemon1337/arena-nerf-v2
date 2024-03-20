@@ -52,6 +52,7 @@ func (s *SensorHitInput) ProcessEvent(evt gpiod.LineEvent) {
 
   select {
     case s.HitChan <- game.NewGameEvent(constants.SENSOR_HIT, []byte("1")):
+      s.Printf("successfully sent %s event to hit chan", constants.SENSOR_HIT)
     default:
       s.Printf("hit channel is full - discarding event: %s", evt)
   }
@@ -85,10 +86,7 @@ func (s *SensorHitInput) Start(parentctx context.Context) error {
   g, ctx := errgroup.WithContext(parentctx)
 
   g.Go(func() error {
-    defer func() {
-      hit.Reconfigure(gpiod.AsInput)
-      hit.Close()
-    }()
+    defer s.Close()
 
     for {
       select {
@@ -96,10 +94,16 @@ func (s *SensorHitInput) Start(parentctx context.Context) error {
         s.ProcessEvent(evt)
       case <-ctx.Done():
         s.Printf("stopping hit input sensor")
+        s.Close()
         return ctx.Err()
       }
     }
   })
 
   return g.Wait()
+}
+
+func (s *SensorHitInput) Close() {
+  s.line.Reconfigure(gpiod.AsInput)
+  s.line.Close()
 }
