@@ -4,6 +4,7 @@ import (
   "os"
   "fmt"
   "log"
+  "slices"
   "strings"
 
   "gopkg.in/yaml.v2"
@@ -16,6 +17,8 @@ import (
 type Config struct {
   NodeName                string      `yaml:"node_name" json:"node_name"`
   EnableController        bool        `yaml:"enable_controller" json:"enable_controller"`
+  EnableServer            bool        `yaml:"enable_server" json:"enable_server"`
+  EnableApiActions        bool        `yaml:"enable_api_actions" json:"enable_api_actions"`
   EnableGameEngine        bool        `yaml:"enable_game_engine" json:"enable_game_engine"`
   EnableNode              bool        `yaml:"enable_node" json:"enable_node"`
   EnableSensors           bool        `yaml:"enable_sensors" json:"enable_sensors"`
@@ -39,6 +42,9 @@ type Config struct {
   WinningScore            int             `yaml:"winning_score" json:"winning_score"`
   GameLength              string          `yaml:"game_length" json:"game_length"`
 
+  // server config
+  WebAddr                 string          `yaml:"web_addr" json:"web_addr"`
+
   Timeout                 int             `yaml:"timeout" json:"timeout"`
   Logdir                  string          `yaml:"logdir" json:"logdir"`
   ConfigFile              string          `yaml:"config_file" json:"config_file"`
@@ -59,6 +65,8 @@ func NewConfig(logger *log.Logger) *Config {
   return &Config{
     NodeName:           nodename,
     EnableController:   false,
+    EnableServer:       false,
+    EnableApiActions:   false,
     EnableGameEngine:   false,
     EnableNode:         false,
     EnableSensors:      false,
@@ -77,6 +85,7 @@ func NewConfig(logger *log.Logger) *Config {
     JoinAddrs:          strings.Split(joinaddrs, ","),
     WinningScore:       10,
     GameLength:         "3m",
+    WebAddr:            ":8080",
     Timeout:            10, // 10 second timeouts
     ConfigFile:         "",
     Logdir:             "/data/logs",
@@ -85,6 +94,10 @@ func NewConfig(logger *log.Logger) *Config {
 }
 
 func (c *Config) Validate() error {
+  c.Nodes = slices.CompactFunc(c.Nodes, strings.EqualFold) // ensure uniq
+  c.Teams = slices.CompactFunc(c.Teams, strings.EqualFold)
+  c.Colors = slices.CompactFunc(c.Colors, strings.EqualFold)
+
   ac := c.AgentConf
   sc := c.SerfConf
 
@@ -130,6 +143,19 @@ func (c *Config) Validate() error {
   sc.RejoinAfterLeave = ac.RejoinAfterLeave
 
   return nil
+}
+
+
+func (c *Config) AddNode(name string) {
+  if !slices.Contains(c.Nodes, name) {
+    c.Nodes = append(c.Nodes, name)
+  }
+}
+
+func (c *Config) AddTeam(name string) {
+  if !slices.Contains(c.Teams, name) {
+    c.Teams = append(c.Teams, name)
+  }
 }
 
 func Getenv(key, val string) string {

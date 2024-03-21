@@ -14,4 +14,7 @@ var (
   ERR_REQUIRED_NODE = errors.New("missing required node")
   ERR_REQUIRED_TEAM = errors.New("missing required team")
   ERR_INVALID_NODE_HIT = errors.New("invalid node hit payload - must be <sensor-id>:<sensor-color>:<hit-count>")
+  ERR_API_ACTIONS_NOT_ALLOWED = errors.New("api actions not allowed")
+  ERR_ONGOING_GAME = errors.New("there is an active game")
+  ERR_UI_ACTION_NOT_ALLOWED = errors.New("that UI action is not supported or allowed")
 )

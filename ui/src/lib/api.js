@@ -22,12 +22,27 @@ export const teams = writable([])
 export const gameevents = writable([])
 export const gamelist = writable([])
 
+/*
+  config            *GameConfig     `yaml:"config" json:"config"`
+  Status            string          `yaml:"status" json:"status"`
+  Teams             []string        `yaml:"teams" json:"teams"`
+  Nodes             []string        `yaml:"nodes" json:"nodes"`
+  Colors            []string        `yaml:"colors" json:"colors"`
+  Scoreboard        map[string]int  `yaml:"scoreboard" json:"scoreboard"`
+  Nodeboard         map[string]int  `yaml:"nodeboard" json:"nodeboard"`
+  Winner            string          `yaml:"winner" json:"winner"`
+  Highscore         int             `yaml:"highscore" json:"highscore"`
+  StartedAt         time.Time       `yaml:"StartedAt" json:"StartedAt"`
+  GameDuration      time.Duration   `yaml:"GameDuration" json:"GameDuration"`
+  EndedAt           time.Time       `yaml:"EndedAt" json:"EndedAt"`
+  Timeline          []GameEvent     `yaml:"timeline" json:"timeline"`
+  Lastcheck         time.Time       `yaml:"last_check" json:"last_check"`
+*/
 export const currentGame = writable({
-  start_at: "",
-  end_at: "",
-  length: "",
-  completed: false,
   status: "no active game",
+  started_at: "",
+  length: 0,
+  ended_at: "",
   winner: "",
   highscore: 0,
 })
@@ -36,7 +51,14 @@ export async function fetchGame(id) {
   const res = await api("/games/" + id)
   let data = await res.json()
   if (data.stats) {
-    currentGame.update(() => Object.assign({start_at: data.stats.start_at, end_at: data.stats.end_at, length: data.stats.length, completed: data.stats.completed, status: data.stats.status, winner: data.stats.winner, highscore: data.stats.highscore }))
+    currentGame.update(() => Object.assign({
+      started_at: data.stats.StartedAt,
+      ended_at: data.stats.EndedAt,
+      length: data.stats.game_duration,
+      status: data.stats.status,
+      winner: data.stats.winner,
+      highscore: data.stats.highscore
+    }))
     scoreboard.update(() => data.stats.scoreboard)
     nodeboard.update(() => data.stats.nodeboard)
     nodes.update(() => data.stats.nodes)

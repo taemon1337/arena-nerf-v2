@@ -11,11 +11,13 @@ import (
   "github.com/taemon1337/arena-nerf/pkg/config"
   "github.com/taemon1337/arena-nerf/pkg/connector"
   "github.com/taemon1337/arena-nerf/pkg/game"
+  "github.com/taemon1337/arena-nerf/pkg/server"
 )
 
 type Controller struct {
   conf          *config.Config
   engine        *game.GameEngine
+  server        *server.Server
   gamechan      *game.GameChannel
   conn          *connector.Connector
   *log.Logger
@@ -27,6 +29,7 @@ func NewController(cfg *config.Config, gamechan *game.GameChannel, logger *log.L
   return &Controller{
     conf:     cfg,
     engine:   game.NewGameEngine(cfg, gamechan, logger),
+    server:   nil,
     gamechan: gamechan,
     conn:     connector.NewConnector(cfg, logger),
     Logger:   logger,
@@ -36,6 +39,14 @@ func NewController(cfg *config.Config, gamechan *game.GameChannel, logger *log.L
 func (ctrl *Controller) Start(ctx context.Context) error {
   ctrl.Printf("starting controller")
   g, ctx := errgroup.WithContext(ctx)
+
+  if ctrl.conf.EnableServer {
+    ctrl.server = server.NewServer()
+    ctrl.Router()
+    g.Go(func() error {
+      return ctrl.server.ListenAndServe(ctrl.conf.WebAddr)
+    })
+  }
 
   if ctrl.conf.EnableConnector {
     err := ctrl.conn.Connect()

@@ -65,15 +65,14 @@ func (n *Node) Start(ctx context.Context) error {
 
   if n.conf.EnableSensors {
     for id, cfg := range n.conf.SensorsConf.Configs {
-      n.nodelock.Lock()
+      sensconf := cfg // local variable to ensure proper (even without closure)
       n.Printf("initializing sensor %s", id)
-      err := cfg.Error()
+      err := sensconf.Error()
       if err != nil && err != constants.ERR_TEST_SENSOR {
         return err
       }
 
-      n.sensors[id] = sensor.NewSensor(id, cfg, n.gamechan, n.Logger, n.conf.EnableLeds, n.conf.EnableHits)
-      n.nodelock.Unlock()
+      n.sensors[id] = sensor.NewSensor(id, sensconf, n.gamechan, n.Logger, n.conf.EnableLeds, n.conf.EnableHits)
     }
   } else {
     n.Printf("sensors disabled")

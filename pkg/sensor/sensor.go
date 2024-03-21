@@ -77,6 +77,7 @@ func (s *Sensor) Start(parentctx context.Context) error {
         s.SensorHit(s.id)
         continue
       case evt := <-s.SensorChan:
+        s.Printf("SENSOR HIT: %s", evt)
         switch evt.Event {
           case constants.SENSOR_HIT:
             s.Printf("sensor received sensor hit game event: %s", evt)
@@ -118,6 +119,7 @@ func (s *Sensor) SensorHit(sensorid string) {
   }
 
   pay := strings.Join([]string{sensorid, s.led.GetColor(), "1"}, constants.SPLIT)
+  s.Printf("preparing to sent sensor hit event...")
   select {
     case s.gamechan.GameChan <- game.NewGameEvent(constants.SENSOR_HIT, []byte(pay)):
       s.Printf("successfully sent sensor hit event: %s", pay)

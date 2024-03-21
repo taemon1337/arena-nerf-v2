@@ -11,6 +11,8 @@ func (c *Config) Flags() error {
 
   flag.StringVar(&c.ConfigFile, "config-file", c.ConfigFile, "path to read/write config yaml to")
   flag.BoolVar(&c.EnableController, "enable-controller", c.EnableController, "enables the controller")
+  flag.BoolVar(&c.EnableServer, "enable-server", c.EnableServer, "enables the controller's web server")
+  flag.BoolVar(&c.EnableApiActions, "enable-api-actions", c.EnableApiActions, "allows game actions through the web server API/UI")
   flag.BoolVar(&c.EnableGameEngine, "enable-game-engine", c.EnableGameEngine, "enables the game engine on the controller")
   flag.BoolVar(&c.EnableNode, "enable-node", c.EnableNode, "enables the node")
   flag.BoolVar(&c.EnableSensors, "enable-sensors", c.EnableSensors, "enables sensors on this node")
@@ -31,17 +33,11 @@ func (c *Config) Flags() error {
   flag.Var((*AppendSliceValue)(&c.Teams), "team", "add teams to be used in games")
   flag.Var((*AppendSliceValue)(&c.Colors), "color", "add color to available colors for LEDs")
   flag.IntVar(&c.Timeout, "timeout", c.Timeout, "number of seconds to wait to timeout nodes/connections/etc")
+  flag.StringVar(&c.WebAddr, "web-addr", c.WebAddr, "The web address to have the controller server listen on")
   flag.StringVar(&c.Logdir, "logdir", c.Logdir, "The directory to store game logs (which are served from the UI)")
 
   // -sensor 1:orangepi:gpiochip0:73:3
   flag.Var(c.SensorsConf, "sensor", "Add a sensor in the form of -sensor one:orangepi:gpiochip0:73:13, <1-4>:<device>:<gpiochip>:<hitpin>:<ledpin:?5vpin>")
-
-  flag.Parse()
-
-  parsedtags, err := UnmarshalTags(tags)
-  if err != nil {
-    return err
-  }
 
   if c.HasConfig() {
     c.Printf("reading config from %s", c.ConfigFile)
@@ -51,11 +47,18 @@ func (c *Config) Flags() error {
     }
   }
 
+  flag.Parse()
+
+  parsedtags, err := UnmarshalTags(tags)
+  if err != nil {
+    return err
+  }
+
   c.AgentConf.NodeName = c.NodeName
   c.AgentConf.Tags = parsedtags
 
   if c.EnableNode {
-    c.Nodes = append(c.Nodes, c.AgentConf.NodeName)
+    c.AddNode(c.AgentConf.NodeName)
   }
 
   if c.EnableController {
